@@ -13,7 +13,7 @@ type Agent = {
 type Tool = {
   name: string;
   description: string;
-  inputSchema: object;
+  inputSchema: Record<string, unknown>;
   execute: (args: Record<string, unknown>, agent: Agent) => Promise<ToolResult>;
 };
 
@@ -223,5 +223,9 @@ export function registerTools(): void {
     );
     return;
   }
-  navigator.modelContext.provideContext({ tools: buildTools() });
+  // @mcp-b/global ambient types declare stricter ToolDescriptor/InputSchema
+  // signatures than the WebMCP draft spec. Our local Tool shape matches the
+  // spec and works at runtime; cast bridges the mismatch at the boundary.
+  (navigator.modelContext as { provideContext: (cfg: { tools: unknown[] }) => void })
+    .provideContext({ tools: buildTools() });
 }
