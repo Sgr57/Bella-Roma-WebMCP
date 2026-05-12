@@ -3,6 +3,7 @@ import { Header } from "./components/Header";
 import { DemoBanner } from "./components/DemoBanner";
 import { ProductGrid } from "./components/ProductGrid";
 import { Cart } from "./components/Cart";
+import { ToolActivityLog } from "./components/ToolActivityLog";
 import { ensureWebMCP, type WebMCPMode } from "./lib/polyfill";
 import { registerTools } from "./lib/webmcp";
 
@@ -24,6 +25,7 @@ export default function App() {
         <ProductGrid />
         <Cart />
       </main>
+      <ToolActivityLog />
     </div>
   );
 }
