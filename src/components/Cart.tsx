@@ -97,6 +97,19 @@ export function Cart() {
               </motion.span>
             </div>
           </motion.div>
+          <button
+            onClick={async () => {
+              const { requestCheckoutConfirmation } = await import("../lib/checkout-bridge");
+              const total = useCartStore.getState().total();
+              const ok = await requestCheckoutConfirmation(total);
+              if (ok) {
+                useCartStore.getState().checkout();
+              }
+            }}
+            className="w-full mt-3 bg-coffee-dark text-coffee-cream py-2 rounded font-medium hover:bg-coffee-mid"
+          >
+            Checkout
+          </button>
         </>
       )}
     </motion.aside>

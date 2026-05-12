@@ -196,10 +196,9 @@ export function buildTools(): Tool[] {
           return err("Il carrello è vuoto, niente da pagare.");
         }
         const total = s.total();
+        const { requestCheckoutConfirmation } = await import("./checkout-bridge");
         const confirmed = await agent.requestUserInteraction(async () => {
-          return window.confirm(
-            `Vuoi confermare il pagamento di €${total.toFixed(2)}?`
-          );
+          return requestCheckoutConfirmation(total);
         });
         if (!confirmed) {
           useCartStore
