@@ -217,14 +217,11 @@ export function buildTools(): Tool[] {
 }
 
 export function registerTools(): void {
-  const nav = navigator as Navigator & {
-    modelContext?: { provideContext: (ctx: { tools: Tool[] }) => void };
-  };
-  if (!nav.modelContext) {
+  if (!navigator.modelContext) {
     console.warn(
       "[webmcp] navigator.modelContext not available, skipping registration"
     );
     return;
   }
-  nav.modelContext.provideContext({ tools: buildTools() });
+  navigator.modelContext.provideContext({ tools: buildTools() });
 }
