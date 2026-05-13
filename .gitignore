@@ -28,3 +28,8 @@ dist-ssr
 .vscode/
 .idea/
 .playwright-mcp/
+
+# Playwright / browser inspection screenshots dumped at repo root
+/*.jpeg
+/*.jpg
+/*.png
