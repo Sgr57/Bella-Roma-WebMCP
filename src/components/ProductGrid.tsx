@@ -53,7 +53,7 @@ export function ProductGrid() {
   const showTakeHome = filter === "all" || filter === "take-home";
 
   return (
-    <section className="px-6 pt-8 pb-12">
+    <section className="pt-0 pb-12">
       <div className="mb-6 flex gap-2 flex-wrap">
         {FILTERS.map((f) => (
           <button

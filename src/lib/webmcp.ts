@@ -195,15 +195,15 @@ export function buildTools(): Tool[] {
             if (!a.tags.every((t) => has.has(t))) return false;
           }
           if (a.dietary && a.dietary.length > 0) {
-            const has = new Set(p.dietary ?? []);
+            const has = new Set<string>(p.dietary ?? []);
             if (!a.dietary.every((d) => has.has(d))) return false;
           }
           if (a.flavor_notes && a.flavor_notes.length > 0) {
-            const has = new Set(p.flavor_notes ?? []);
+            const has = new Set<string>(p.flavor_notes ?? []);
             if (!a.flavor_notes.every((f) => has.has(f))) return false;
           }
           if (a.time_of_day) {
-            const has = new Set(p.time_of_day ?? []);
+            const has = new Set<string>(p.time_of_day ?? []);
             if (!has.has(a.time_of_day) && !has.has("anytime")) return false;
           }
           if (q && !`${p.name} ${p.description}`.toLowerCase().includes(q))
