@@ -187,4 +187,45 @@ describe("WebMCP tools", () => {
     expect(res.content[0].text).not.toContain("Latte di soia");
     expect(res.content[0].text).toContain("Latte d'avena");
   });
+
+  it("get_product returns rich details for existing product", async () => {
+    const res = await findTool("get_product").execute(
+      { product_id: "cappuccino" },
+      fakeAgent,
+    );
+    expect(res.isError).toBeFalsy();
+    const t = res.content[0].text;
+    expect(t).toContain("Cappuccino");
+    expect(t).toContain("Intensità");
+    expect(t).toContain("cornetto-vuoto");
+    expect(t).toContain("Latte");
+  });
+
+  it("get_product flags out of stock with alternatives", async () => {
+    const res = await findTool("get_product").execute(
+      { product_id: "milk-soy" },
+      fakeAgent,
+    );
+    expect(res.isError).toBeFalsy();
+    const t = res.content[0].text;
+    expect(t.toLowerCase()).toContain("esaurito");
+    expect(t).toContain("milk-oat");
+    expect(t).toContain("milk-almond");
+  });
+
+  it("get_product surfaces related_products for cross-modal", async () => {
+    const res = await findTool("get_product").execute(
+      { product_id: "filtro-etiopia" },
+      fakeAgent,
+    );
+    expect(res.content[0].text).toContain("beans-etiopia-250g");
+  });
+
+  it("get_product returns error for unknown id", async () => {
+    const res = await findTool("get_product").execute(
+      { product_id: "ghost" },
+      fakeAgent,
+    );
+    expect(res.isError).toBe(true);
+  });
 });

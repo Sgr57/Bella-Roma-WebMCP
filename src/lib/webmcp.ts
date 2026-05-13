@@ -185,6 +185,107 @@ export function buildTools(): Tool[] {
       },
     },
     {
+      name: "get_product",
+      description:
+        "Restituisce la scheda completa di un prodotto: attributi (intensità, origine, note aromatiche, dietary, tag, time_of_day), disponibilità, alternative se esaurito, pairing consigliati, prodotti correlati (es. chicchi da asporto della stessa bevanda) e opzioni di personalizzazione (size, milk, sweetness). Usalo per ragionare su un singolo prodotto in dettaglio.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          product_id: { type: "string", description: "L'id del prodotto" },
+        },
+        required: ["product_id"],
+      },
+      async execute(args) {
+        const { product_id } = args as { product_id: string };
+        const p = getProductById(product_id);
+        if (!p) {
+          useCartStore
+            .getState()
+            .logToolCall("get_product", args, "non trovato");
+          return err(`Prodotto "${product_id}" non trovato.`);
+        }
+        const lines: string[] = [];
+        lines.push(`# ${p.name} (${p.id})`);
+        lines.push(`Tipo: ${p.type} · Categoria: ${p.category}`);
+        lines.push(`Prezzo base: €${p.price.toFixed(2)}`);
+        if (typeof p.intensity === "number")
+          lines.push(`Intensità: ${p.intensity}/10`);
+        if (p.origin) lines.push(`Origine: ${p.origin}`);
+        if (p.flavor_notes?.length)
+          lines.push(`Note aromatiche: ${p.flavor_notes.join(", ")}`);
+        if (p.dietary?.length) lines.push(`Dietary: ${p.dietary.join(", ")}`);
+        if (p.temperature) lines.push(`Servizio: ${p.temperature}`);
+        if (p.time_of_day?.length)
+          lines.push(`Momento: ${p.time_of_day.join(", ")}`);
+        if (p.tags?.length) lines.push(`Tag: ${p.tags.join(", ")}`);
+        lines.push(`Disponibilità: ${p.available ? "disponibile" : "ESAURITO"}`);
+        if (!p.available && p.alternatives?.length) {
+          const altLabels = p.alternatives
+            .map((id) => {
+              const a = getProductById(id);
+              return a ? `${a.name} (${a.id})` : id;
+            })
+            .join(", ");
+          lines.push(`Alternative consigliate: ${altLabels}`);
+        }
+        if (p.pairings?.length) {
+          const ps = p.pairings
+            .map((id) => {
+              const x = getProductById(id);
+              return x ? `${x.name} (${x.id})` : id;
+            })
+            .join(", ");
+          lines.push(`Pairing consigliati: ${ps}`);
+        }
+        if (p.related_products?.length) {
+          const rs = p.related_products
+            .map((id) => {
+              const x = getProductById(id);
+              return x ? `${x.name} (${x.id})` : id;
+            })
+            .join(", ");
+          lines.push(`Prodotti correlati: ${rs}`);
+        }
+        if (p.options) {
+          lines.push("Opzioni:");
+          if (p.options.size) {
+            const sz = p.options.size;
+            const mods = sz.values
+              .map(
+                (v) =>
+                  `${v}${sz.price_modifier[v] ? ` (+€${sz.price_modifier[v]?.toFixed(2)})` : ""}`,
+              )
+              .join(", ");
+            lines.push(`  - size: ${mods} · default ${sz.default}`);
+          }
+          if (p.options.milk) {
+            const milkLabels = p.options.milk.values
+              .map((id) => {
+                const m = getProductById(id);
+                if (!m) return id;
+                const avail = m.available ? "" : " [ESAURITO]";
+                const mod = m.price > 0 ? ` (+€${m.price.toFixed(2)})` : "";
+                return `${m.name} (${m.id})${mod}${avail}`;
+              })
+              .join(", ");
+            lines.push(
+              `  - milk: ${milkLabels} · default ${p.options.milk.default}`,
+            );
+          }
+          if (p.options.sweetness) {
+            lines.push(
+              `  - sweetness: ${p.options.sweetness.values.join(", ")} · default ${p.options.sweetness.default}`,
+            );
+          }
+        }
+        const text = lines.join("\n");
+        useCartStore
+          .getState()
+          .logToolCall("get_product", args, `${p.id} (${p.type})`);
+        return ok(text);
+      },
+    },
+    {
       name: "add_to_cart",
       description: "Aggiunge un prodotto al carrello in una certa quantità.",
       inputSchema: {
