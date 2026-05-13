@@ -2,7 +2,9 @@
 
 > **Proof-of-Concept**: una vetrina e‑commerce *agent-ready*. Un agente AI (Claude Desktop) ordina caffè, applica coupon e fa checkout su una pagina React **senza** vedere il DOM, senza scraper, senza pilotare il cursore — chiama direttamente i tool che la pagina espone.
 
-Single-page React app che simula la torrefazione fittizia **Bella Roma Coffee** ed espone le sue azioni come **6 tool WebMCP** invocabili da un agente AI nel browser tramite `navigator.modelContext`. Pensata per una demo da 60 secondi davanti a stakeholder non tecnici, ma costruita su standard reali (W3C Draft Community Group Report, febbraio 2026).
+Single-page React app che simula la torrefazione fittizia **Bella Roma Coffee** ed espone le sue azioni come **7 tool WebMCP** invocabili da un agente AI nel browser tramite `navigator.modelContext`. Pensata per una demo da 60 secondi davanti a stakeholder non tecnici, ma costruita su standard reali (W3C Draft Community Group Report, febbraio 2026).
+
+Il catalogo include 27 prodotti (13 drink, 4 food, 3 chicchi take-home, 2 capsule, 5 opzioni latte di cui una "esaurita" per dimostrare la sostituzione). Ogni prodotto è annotato con intensità, origine, note aromatiche, dietary, tag, pairing, prodotti correlati e opzioni di personalizzazione (size / latte / zucchero). Il set di tool resta volutamente minimale: l'agente compone primitive piccole invece di chiamare endpoint di alto livello.
 
 ## Scopo
 
@@ -93,13 +95,17 @@ In Claude Desktop chiedi:
 
 > *"List the connected WebMCP sources"*
 
-Deve elencare la tab **"Bella Roma Coffee"** con i 6 tool. Poi prova uno dei prompt del banner:
+Deve elencare la tab **"Bella Roma Coffee"** con i 7 tool. Poi prova uno dei prompt del banner **"I più chiesti"** in alto (clicca per copiare). I 7 prompt sono pensati per mostrare capacità WebMCP diverse:
 
-- *"Ordina 2 espresso e 1 cappuccino, applica BENVENUTO e fai checkout"*
-- *"Mostrami solo i caffè sotto i 2 euro"*
-- *"Svuota il carrello e ricomincia"*
+- *"Qualcosa di leggero e fruttato, senza latte, sotto i 4 euro"* — filtri compositi da linguaggio naturale
+- *"Sto prendendo un cappuccino, abbinaci qualcosa di dolce ma non pesante"* — pairing cross-categoria
+- *"Vorrei un cappuccino con latte di soia"* — sostituzione live su disponibilità (la soia è esaurita)
+- *"Componi un ordine colazione per 3 persone, max 15 euro, uno deve essere decaffeinato"* — bundle multi-item con vincoli
+- *"Mi è piaciuto il Filtro Etiopia, voglio portarmene a casa 250g"* — cross-modal bar → take-home
+- *"Cappuccino grande con latte d'avena, senza zucchero"* — customizzazione drink
+- *"Cosa va bene con quello che ho già nel carrello?"* — awareness del carrello
 
-L'agente invoca i tool, vedrai i prodotti volare nel carrello, il coupon applicarsi, e al `checkout` apparirà un modale di conferma — momento clou: l'AI non agisce alle tue spalle.
+L'agente invoca i tool, vedrai i prodotti volare nel carrello, le sostituzioni proposte sulla disponibilità, e al `checkout` apparirà un modale di conferma — momento clou: l'AI non agisce alle tue spalle.
 
 ### Come funzionano i due bridge
 
@@ -139,14 +145,21 @@ Tutto il routing tra i due bridge è in `src/lib/relay.ts` → `connectRelay(mod
 
 ## Tool esposti
 
+7 tool totali. Filosofia di design: **primitive piccole, agente compositore.** I tre tool "core" sono ricchi; ogni scenario complesso (bundle, pairing, upsell, sostituzione) viene composto dall'agente combinandoli, senza endpoint di alto livello.
+
 | Tool | Cosa fa | Conferma utente |
 |---|---|---|
-| `search_products` | Filtra catalogo per categoria/prezzo/testo | no |
-| `add_to_cart` | Aggiunge prodotto al carrello | no |
+| `search_products` | Filtra catalogo: categoria, tipo (drink/food/beans/capsule/milk_option), prezzo max, tag, dietary, note aromatiche, origine, intensità min/max, momento della giornata, in-stock-only, testo libero | no |
+| `get_product` | Scheda completa di un prodotto: attributi, disponibilità, alternative se esaurito, pairing, prodotti correlati cross-modal, opzioni di personalizzazione | no |
+| `add_to_cart` | Aggiunge un prodotto al carrello con `options` (size, milk, sweetness). Ritorna errore strutturato con `alternatives[]` se il prodotto o l'opzione latte richiesta è ESAURITA | no |
 | `remove_from_cart` | Rimuove riga | no |
 | `apply_coupon` | Applica `BENVENUTO` (-10%) o `STUDENTI` (-20% max €5) | no |
-| `get_cart` | Ritorna stato carrello | no |
+| `get_cart` | Ritorna stato carrello (incluse opzioni per riga e prezzi con modifier) | no |
 | `checkout` | Conferma ordine | **sì** (modale `requestUserInteraction`) |
+
+### Schema prodotto
+
+Ogni `Product` ha campi opzionali ricchi: `intensity` (1-10), `origin`, `flavor_notes[]`, `dietary[]`, `temperature`, `tags[]`, `time_of_day[]`, `pairings[]` (id di prodotti consigliati in pairing), `related_products[]` (varianti cross-modal: drink → chicchi/capsule equivalenti), `available`, `alternatives[]` (id di sostituti coerenti se esaurito), `options` (size con price modifier, milk che referenzia `milk_option` items, sweetness). Dettagli in [`src/lib/products.ts`](src/lib/products.ts).
 
 ## Test
 
@@ -159,8 +172,10 @@ Test su `store/cart`, `lib/products`, `lib/webmcp` (catalogo, store, tool adapte
 
 ## Architettura
 
-- **Zustand** (`src/store/cart.ts`) è la *single source of truth* per carrello, coupon applicato e log delle invocazioni dei tool.
-- **`src/lib/webmcp.ts`** è l'**adapter** tra l'API WebMCP e lo store. Espone `buildTools()` (6 tool) e `registerTools()` che è ora **dual-API**: usa `navigator.modelContext.registerTool(t)` (W3C spec, nativo) oppure `provideContext({tools})` (polyfill `@mcp-b/global`) a seconda di chi è presente. Idempotente (guard `registered` + dedup via `getTools()` quando disponibile).
+- **Zustand** (`src/store/cart.ts`) è la *single source of truth* per carrello, coupon applicato e log delle invocazioni dei tool. Le righe del carrello supportano `options` (size, milk, sweetness): righe con options identiche si fondono; righe con options diverse restano distinte. `lineUnitPrice(item)` calcola il prezzo includendo il `size.price_modifier` e il `price` del milk option scelto come modificatore.
+- **`src/lib/products.ts`** ospita lo schema `Product` esteso e il catalogo a 27 entry (5 tipi: drink, food, beans, capsule, milk_option). Helper `getProductById` e `getProductsByType`.
+- **`src/lib/prompts.ts`** è la lista condivisa dei 7 prompt suggeriti (`TOP_PROMPTS`) e dei 3 selezionati per l'empty state del carrello (`CART_EMPTY_PROMPT_IDS`).
+- **`src/lib/webmcp.ts`** è l'**adapter** tra l'API WebMCP e lo store. Espone `buildTools()` (7 tool) e `registerTools()` che è **dual-API**: usa `navigator.modelContext.registerTool(t)` (W3C spec, nativo) oppure `provideContext({tools})` (polyfill `@mcp-b/global`) a seconda di chi è presente. Idempotente (guard `registered` + dedup via `getTools()` quando disponibile).
 - **`src/lib/polyfill.ts`** rileva la modalità (`native` / `polyfill` / `unavailable`) e carica `@mcp-b/global` solo se serve. Distingue native vs polyfill anche quando entrambi appaiono presenti, leggendo `constructor.name` e l'assenza di `provideContext`.
 - **`src/lib/relay.ts`** (orchestratore) — legge il flag `?relay=true`, chiama `connectRelay(mode)` che instrada al bridge giusto:
   - `mode === "native"` → import dinamico di `relay-client.ts` (vedi sotto).
@@ -168,9 +183,12 @@ Test su `store/cart`, `lib/products`, `lib/webmcp` (catalogo, store, tool adapte
 - **`src/lib/relay-client.ts`** (~165 LoC) — implementa il protocollo del relay direttamente: `WebSocket` verso `127.0.0.1:9333`, handshake `hello` + `tools/list`, gestione `invoke/result`, `ping/pong`, reconnect con backoff (2s → 30s). Nessuna dipendenza da `executeTool` non-spec di Chrome: dispatcha localmente chiamando `tool.execute(args, fakeClient)`. Espone `onRelayState(...)` per l'indicatore in Header.
 - **`src/lib/checkout-bridge.ts`** è un piccolo event-bridge: il tool `checkout` invoca `requestCheckoutConfirmation(total)` dentro `agent.requestUserInteraction(...)` se l'agent è disponibile, altrimenti chiama il bridge diretto (il modale React si apre lo stesso).
 - I componenti React (`Header` a 3 layer in stile Lavazza, `Hero`, `DemoBanner`, `ProductGrid`, `ProductCard`, `Cart`, `CartItem`, `ToolActivityLog`, `CheckoutModal`, `Footer`) leggono dallo store: la UI manuale (click) e quella agentica (tool) passano dagli stessi update — *esattamente il vantaggio chiave di WebMCP*. Le due pill di stato (WebMCP + Relay) e il toggle relay vivono nella **utility strip** dell'`Header`.
+- `DemoBanner` mostra i 7 prompt come pill compatte cliccabili (copia negli appunti con feedback inline). Il `Cart` empty state ripropone 3 prompt action-oriented (filtra, componi bundle, customizza) come pill estese.
+- `ProductCard` legge l'intensità per-prodotto, mostra fino a 2 tag pill e un badge "Esaurito" con CTA disabilitata se `!available`. `ProductGrid` raggruppa il catalogo in tre sezioni (drink, food, take-home) con chip filtro `Tutto / Al bar / Pasticceria / Da asporto`. `CartItem` mostra le opzioni selezionate ("Grande · Avena · Senza zucchero") sotto il nome.
 
-Design completo in [`docs/superpowers/specs/2026-05-12-bella-roma-coffee-demo-design.md`](docs/superpowers/specs/2026-05-12-bella-roma-coffee-demo-design.md).
-Piano di implementazione in [`docs/superpowers/plans/2026-05-12-bella-roma-coffee-demo.md`](docs/superpowers/plans/2026-05-12-bella-roma-coffee-demo.md).
+Design completo della demo iniziale in [`docs/superpowers/specs/2026-05-12-bella-roma-coffee-demo-design.md`](docs/superpowers/specs/2026-05-12-bella-roma-coffee-demo-design.md), piano in [`docs/superpowers/plans/2026-05-12-bella-roma-coffee-demo.md`](docs/superpowers/plans/2026-05-12-bella-roma-coffee-demo.md).
+
+Catalog expansion (7 scenari wow, catalogo a 27 prodotti, `get_product`): spec in [`docs/superpowers/specs/2026-05-13-catalog-expansion-design.md`](docs/superpowers/specs/2026-05-13-catalog-expansion-design.md), piano in [`docs/superpowers/plans/2026-05-13-catalog-expansion.md`](docs/superpowers/plans/2026-05-13-catalog-expansion.md).
 
 ## Stack
 
@@ -178,7 +196,7 @@ Vite 6 · React 18 · TypeScript 5 · Tailwind CSS 3 · Zustand · Framer Motion
 
 ## Note per la demo dal vivo
 
-- **Banner istruzioni**: ha 3 prompt pronti al copia-incolla.
+- **Banner "I più chiesti"**: 7 prompt pronti al copia-incolla (click sulla pill → clipboard, flash arancione di conferma). Un sottoinsieme di 3 prompt (filtra, componi, customizza) compare anche nell'empty state del carrello come scorciatoia contestuale.
 - **Reset demo**: bottone in header. Svuota carrello, rimuove coupon, pulisce il Tool Activity Log.
 - **Tool Activity Log**: pannello in basso a destra che mostra in tempo reale ogni invocazione di tool (nome, args, risultato, timestamp).
 - **Fallback manuale**: il bottone "Checkout" in carrello funziona anche senza agente (utile per smoke test e in caso di problemi di connessione il giorno della demo).
