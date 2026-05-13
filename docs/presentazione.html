@@ -1,0 +1,1734 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WebMCP — Il web programmabile per agenti AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* paper */
+    --paper:        #efe6d1;
+    --paper-deep:   #e3d6b6;
+    --paper-edge:   #c8b791;
+
+    /* ink */
+    --ink:          #0d1812;
+    --ink-soft:     #2c3a30;
+    --ink-mute:     #6b7c70;
+    --ink-faint:    #aea58b;
+
+    /* reply green */
+    --green:        #0d5a3d;
+    --green-deep:   #063524;
+    --green-darker: #042417;
+    --green-bright: #2da765;
+    --green-glow:   #7de8a8;
+    --green-soft:   #c4d8c7;
+    --green-tint:   rgba(13, 90, 61, 0.08);
+
+    --hot:          #c9482f;
+
+    /* code */
+    --code-bg:      #061a13;
+    --code-fg:      #e8dfc6;
+    --code-mute:    #5a7065;
+    --code-key:     #f2b56c;
+    --code-str:     #7de8a8;
+    --code-fn:      #6fc6e0;
+    --code-com:     #4a6b58;
+
+    /* type */
+    --serif: "Instrument Serif", "Times New Roman", serif;
+    --sans:  "IBM Plex Sans", -apple-system, sans-serif;
+    --mono:  "IBM Plex Mono", ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;
+  }
+
+  /* === atmosphere layers === */
+  body::before, body::after {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+  /* paper grain */
+  body::before {
+    background-image:
+      radial-gradient(rgba(13,24,18,.04) 1px, transparent 1px),
+      radial-gradient(rgba(13,24,18,.025) 1px, transparent 1px);
+    background-size: 3px 3px, 7px 7px;
+    background-position: 0 0, 1px 2px;
+    mix-blend-mode: multiply;
+  }
+  /* vignette + green bloom */
+  body::after {
+    background:
+      radial-gradient(120% 100% at 100% 100%, var(--green-tint), transparent 55%),
+      radial-gradient(80% 60% at 0% 0%, rgba(13,24,18,.04), transparent 60%),
+      radial-gradient(100% 80% at 50% 100%, transparent 70%, rgba(13,24,18,.08));
+  }
+
+  /* === DECK === */
+  .deck { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+
+  .slide {
+    position: absolute; inset: 0;
+    padding: 6.5vh 7.5vw 7.5vh;
+    display: none;
+    flex-direction: column;
+    z-index: 2;
+  }
+  .slide.active { display: flex; animation: slideIn .65s cubic-bezier(.18,.7,.08,1) both; }
+
+  @keyframes slideIn {
+    0%   { opacity: 0; transform: translateY(18px) scale(.997); filter: blur(3px); }
+    100% { opacity: 1; transform: translateY(0)    scale(1);    filter: blur(0); }
+  }
+
+  /* staggered children */
+  .slide.active .stagger > * { opacity: 0; animation: rise .75s cubic-bezier(.18,.7,.08,1) forwards; }
+  .slide.active .stagger > *:nth-child(1) { animation-delay: .08s; }
+  .slide.active .stagger > *:nth-child(2) { animation-delay: .20s; }
+  .slide.active .stagger > *:nth-child(3) { animation-delay: .32s; }
+  .slide.active .stagger > *:nth-child(4) { animation-delay: .44s; }
+  .slide.active .stagger > *:nth-child(5) { animation-delay: .56s; }
+  .slide.active .stagger > *:nth-child(6) { animation-delay: .68s; }
+  .slide.active .stagger > *:nth-child(7) { animation-delay: .80s; }
+  .slide.active .stagger > *:nth-child(8) { animation-delay: .92s; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* === CHROME === */
+  .chrome {
+    position: fixed; left: 0; right: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 2vh 2.6vw;
+    font-family: var(--mono);
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--ink-mute);
+    pointer-events: none;
+  }
+  .chrome.top { top: 0; }
+  .chrome.bottom { bottom: 0; }
+  .chrome button {
+    pointer-events: auto;
+    font: inherit; color: inherit; background: none; border: 0;
+    cursor: pointer; padding: 4px 10px;
+    transition: color .18s, transform .18s;
+  }
+  .chrome button:hover { color: var(--green); transform: translateY(-1px); }
+
+  .mark { display: inline-flex; align-items: center; gap: 12px; font-family: var(--mono); color: var(--ink); }
+  .mark svg { display: block; }
+
+  .counter b { font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* progress + slide indicator pip */
+  .progress {
+    position: fixed; left: 0; bottom: 0; height: 3px;
+    background: var(--green);
+    transition: width .55s cubic-bezier(.18,.7,.08,1);
+    z-index: 6;
+    box-shadow: 0 0 18px var(--green-bright);
+  }
+
+  /* on dark/green slides, invert chrome */
+  .slide.dark.active ~ .chrome,
+  body.on-dark .chrome { color: rgba(239,230,209,.55); }
+  body.on-dark .chrome .mark, body.on-dark .counter b { color: var(--paper); }
+  body.on-dark .progress { background: var(--green-glow); }
+
+  /* === TYPOGRAPHY === */
+  .kicker {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .26em;
+    text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 1.4rem;
+    display: inline-flex; align-items: center; gap: 14px;
+  }
+  .kicker .num {
+    color: var(--ink-mute);
+    border-right: 1px solid var(--ink-faint);
+    padding-right: 14px;
+  }
+  .kicker .dot {
+    width: 6px; height: 6px; background: var(--green); border-radius: 50%;
+    box-shadow: 0 0 0 4px var(--green-soft);
+  }
+
+  h1.display {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(64px, 11.5vw, 200px);
+    line-height: .88;
+    letter-spacing: -0.02em;
+  }
+  h1.display em { font-style: italic; color: var(--green); }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(40px, 6.2vw, 96px);
+    line-height: .96;
+    letter-spacing: -0.012em;
+    max-width: 22ch;
+    margin-bottom: 2.2rem;
+  }
+  h2 em { font-style: italic; color: var(--green); }
+  h2 .strike {
+    text-decoration: line-through;
+    text-decoration-thickness: 3px;
+    text-decoration-color: var(--hot);
+    color: var(--ink-mute);
+  }
+
+  h3 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(22px, 2.4vw, 32px);
+    line-height: 1.12;
+    letter-spacing: -0.008em;
+    margin-bottom: .6rem;
+  }
+
+  p.lead {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(22px, 2.4vw, 34px);
+    line-height: 1.32;
+    color: var(--ink-soft);
+    max-width: 30ch;
+  }
+  p.lead em { color: var(--green); font-style: italic; }
+  p.lead .non-italic { font-style: normal; }
+
+  p, li { font-size: clamp(15px, 1.1vw, 16.5px); line-height: 1.6; color: var(--ink-soft); }
+  li { list-style: none; }
+
+  .label-s {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+
+  code, .mono { font-family: var(--mono); font-feature-settings: "zero", "ss03"; }
+
+  /* === LAYOUT HELPERS === */
+  .row { display: flex; gap: 4vw; }
+  .col { flex: 1; min-width: 0; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 3vw; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.4vw; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2vw; }
+  .grid-5-7 { display: grid; grid-template-columns: 5fr 7fr; gap: 4vw; }
+  .grid-7-5 { display: grid; grid-template-columns: 7fr 5fr; gap: 4vw; }
+  .end { margin-top: auto; }
+  hr.rule { border: 0; border-top: 1px solid var(--ink); width: 60px; margin: 1.5rem 0; }
+  hr.rule.full { width: 100%; border-color: var(--ink-faint); }
+
+  /* === COVER === */
+  .cover {
+    justify-content: center;
+    padding: 0 7vw;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover-bloom {
+    position: absolute;
+    bottom: -20vh; right: -10vw;
+    width: 80vw; height: 80vh;
+    background: radial-gradient(closest-side, var(--green) 0%, var(--green-tint) 35%, transparent 70%);
+    opacity: .35;
+    pointer-events: none;
+    filter: blur(6px);
+  }
+  .cover .meta-row {
+    position: absolute;
+    top: 6vh; left: 7vw; right: 7vw;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .18em; text-transform: uppercase; color: var(--ink-mute);
+  }
+  .cover .meta-row .reply {
+    display: inline-flex; align-items: center; gap: 10px;
+    color: var(--ink);
+  }
+  .cover h1 {
+    font-family: var(--serif);
+    font-size: clamp(88px, 17vw, 280px);
+    line-height: .82;
+    letter-spacing: -0.03em;
+    font-weight: 400;
+  }
+  .cover h1 .line-a { display: block; color: var(--ink); }
+  .cover h1 .line-b { display: block; color: var(--green); font-style: italic; padding-left: 6vw; }
+  .cover h1 .dot { color: var(--green-bright); }
+  .cover .subtitle {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(24px, 2.8vw, 40px);
+    color: var(--ink-soft);
+    margin-top: 2.2rem;
+    max-width: 36ch;
+    line-height: 1.22;
+    padding-left: 6vw;
+  }
+  .cover .subtitle em { color: var(--green); }
+  .cover .tag {
+    position: absolute; bottom: 7vh; left: 7vw; right: 7vw;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--ink-mute);
+    display: flex; gap: 2.5rem; flex-wrap: wrap; align-items: center;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--ink-faint);
+  }
+  .cover .tag span { display: inline-flex; align-items: center; gap: 8px; }
+  .cover .tag span::before {
+    content: ""; display: inline-block; width: 6px; height: 6px;
+    background: var(--green); border-radius: 50%;
+  }
+
+  /* === CHAPTER DIVIDER (DARK GREEN) === */
+  .chapter {
+    background: var(--green-deep);
+    color: var(--paper);
+    padding: 7vh 8vw;
+    position: relative;
+    overflow: hidden;
+  }
+  .chapter::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(120% 80% at 20% 0%, rgba(125,232,168,.10), transparent 50%),
+      radial-gradient(80% 60% at 100% 100%, rgba(13,90,61,.6), transparent 60%);
+    pointer-events: none;
+  }
+  .chapter::after {
+    content: "";
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size: 4px 4px;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+  .chapter > * { position: relative; z-index: 1; }
+  .chapter .kicker { color: var(--green-glow); }
+  .chapter .kicker .num { color: rgba(239,230,209,.45); border-right-color: rgba(239,230,209,.2); }
+  .chapter .kicker .dot { background: var(--green-glow); box-shadow: 0 0 0 4px rgba(125,232,168,.18); }
+  .chapter .roman {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(160px, 26vw, 380px);
+    line-height: .82;
+    color: var(--green-glow);
+    letter-spacing: -0.04em;
+    font-weight: 400;
+    margin-top: auto;
+    text-shadow: 0 0 80px rgba(125,232,168,.25);
+  }
+  .chapter h2 {
+    color: var(--paper);
+    max-width: 22ch;
+    margin-top: 1rem;
+    margin-bottom: 0;
+    font-size: clamp(38px, 5.4vw, 76px);
+  }
+  .chapter h2 em { color: var(--green-glow); }
+  .chapter .descriptor {
+    font-family: var(--mono); font-size: 12px;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: rgba(239,230,209,.55);
+    margin-top: 2.5rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid rgba(239,230,209,.2);
+    max-width: 60ch;
+    line-height: 1.8;
+  }
+  .chapter .corner-num {
+    position: absolute; top: 6vh; right: 7vw;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: rgba(239,230,209,.45);
+  }
+  .chapter .leaf {
+    position: absolute; bottom: 0; right: 0;
+    width: 38vw; height: 38vw;
+    opacity: .35;
+    pointer-events: none;
+  }
+  .chapter .leaf svg { width: 100%; height: 100%; }
+
+  /* === MANIFESTO (statement slide) === */
+  .manifesto {
+    justify-content: center;
+    padding: 8vh 12vw;
+    position: relative;
+  }
+  .manifesto .quote {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(46px, 7.5vw, 120px);
+    line-height: 1.0;
+    letter-spacing: -0.018em;
+    color: var(--ink);
+    max-width: 22ch;
+  }
+  .manifesto .quote em { color: var(--green); }
+  .manifesto .quote .strike {
+    text-decoration: line-through;
+    text-decoration-thickness: 4px;
+    text-decoration-color: var(--hot);
+    color: var(--ink-mute);
+    font-style: italic;
+  }
+  .manifesto .marker {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 2rem;
+  }
+  .manifesto .marker::before {
+    content: "—— "; color: var(--green-bright);
+  }
+  .manifesto .attribution {
+    font-family: var(--mono); font-size: 12px;
+    letter-spacing: .18em; text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-top: 3rem;
+    border-top: 1px solid var(--ink-faint);
+    padding-top: 1rem;
+    max-width: 50ch;
+    line-height: 1.6;
+  }
+
+  /* === PILLS === */
+  .pill {
+    display: inline-flex; align-items: center;
+    padding: 7px 14px;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .14em; text-transform: uppercase;
+    border: 1px solid var(--ink); color: var(--ink);
+    background: transparent;
+    border-radius: 999px;
+    transition: background .2s, color .2s;
+  }
+  .pill.green  { border-color: var(--green); color: var(--green); }
+  .pill.hot    { border-color: var(--hot);   color: var(--hot); }
+  .pill.solid  { background: var(--green); color: var(--paper); border-color: var(--green); }
+  .pill.solid-ink  { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  /* === CODE BLOCK === */
+  pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    padding: 1.8rem 2rem;
+    border-radius: 3px;
+    overflow: auto;
+    position: relative;
+    box-shadow:
+      8px 8px 0 var(--green),
+      0 30px 60px -30px rgba(6,53,36,.6);
+    border: 1px solid var(--green-deep);
+  }
+  pre::before {
+    content: attr(data-lang);
+    position: absolute;
+    top: 12px; right: 16px;
+    font-size: 10px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--code-mute);
+  }
+  pre::after {
+    content: "";
+    position: absolute;
+    top: 12px; left: 16px;
+    width: 8px; height: 8px;
+    background: var(--green-glow); border-radius: 50%;
+    box-shadow: 14px 0 0 #f2b56c, 28px 0 0 #c9482f;
+    opacity: .85;
+  }
+  pre .k  { color: var(--code-key); }
+  pre .s  { color: var(--code-str); }
+  pre .f  { color: var(--code-fn); }
+  pre .c  { color: var(--code-com); font-style: italic; }
+  pre .n  { color: var(--code-fg); }
+  pre .p  { color: var(--code-mute); }
+
+  /* === CARDS === */
+  .card {
+    border: 1px solid var(--ink-faint);
+    background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0));
+    padding: 1.8rem 1.8rem 1.6rem;
+    position: relative;
+    transition: transform .25s, box-shadow .25s, border-color .25s;
+    backdrop-filter: blur(4px);
+  }
+  .slide.active .card { animation: cardIn .8s cubic-bezier(.18,.7,.08,1) both; }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .card:hover {
+    transform: translateY(-2px);
+    border-color: var(--green);
+    box-shadow: 0 16px 40px -20px rgba(13,90,61,.3);
+  }
+  .card .icon {
+    width: 42px; height: 42px;
+    background: var(--green); color: var(--paper);
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 3px;
+    font-family: var(--serif); font-style: italic; font-size: 24px;
+    margin-bottom: 1.3rem;
+    box-shadow: 4px 4px 0 var(--green-deep);
+  }
+  .card.alt .icon { background: var(--ink); box-shadow: 4px 4px 0 var(--green); }
+  .card.hot-card .icon { background: var(--hot); box-shadow: 4px 4px 0 var(--ink); }
+  .card h4 {
+    font-family: var(--serif); font-weight: 400; font-size: 24px;
+    margin-bottom: .65rem; letter-spacing: -0.01em; line-height: 1.1;
+    color: var(--ink);
+  }
+  .card h4 em { color: var(--green); font-style: italic; }
+  .card p { font-size: 14.5px; line-height: 1.55; }
+  .card.numbered::after {
+    content: attr(data-n);
+    position: absolute; top: 12px; right: 16px;
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: .22em; color: var(--ink-mute);
+  }
+
+  /* === COMPARISON TABLE === */
+  table.compare {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+  }
+  table.compare th, table.compare td {
+    padding: 16px 20px;
+    text-align: left;
+    border-bottom: 1px solid var(--ink-faint);
+    vertical-align: top;
+  }
+  table.compare thead th {
+    font-family: var(--mono); font-weight: 500; font-size: 11px;
+    letter-spacing: .18em; text-transform: uppercase;
+    color: var(--ink-mute);
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 12px;
+  }
+  table.compare thead th:first-child { color: var(--ink); }
+  table.compare thead th.web { color: var(--green); border-bottom-color: var(--green); }
+  table.compare td:first-child {
+    font-family: var(--serif); font-weight: 400; font-size: 19px;
+    font-style: italic;
+    color: var(--ink);
+    width: 22%;
+  }
+  table.compare td.web {
+    color: var(--green);
+    font-weight: 500;
+  }
+  table.compare tr:hover { background: var(--green-tint); }
+
+  /* === STEPS === */
+  ol.steps { counter-reset: step; list-style: none; }
+  ol.steps li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    gap: 1.5rem;
+    padding: 1.2rem 0;
+    border-bottom: 1px dashed var(--ink-faint);
+    align-items: baseline;
+    transition: background .2s, padding-left .2s;
+  }
+  ol.steps li:hover { background: var(--green-tint); padding-left: .6rem; }
+  ol.steps li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: .14em;
+    color: var(--green);
+  }
+  ol.steps li b {
+    font-family: var(--serif); font-weight: 400; font-size: 22px;
+    font-style: italic;
+    color: var(--ink); display: block; margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+  ol.steps li span { font-size: 14.5px; color: var(--ink-soft); }
+
+  /* === VS PANELS === */
+  .vs {
+    display: grid;
+    grid-template-columns: 1fr 64px 1fr;
+    gap: 1.5rem;
+    align-items: stretch;
+    margin-top: 2.2rem;
+  }
+  .vs-panel {
+    padding: 2.2rem 2rem;
+    display: flex; flex-direction: column;
+    min-height: 340px;
+    position: relative;
+  }
+  .vs-panel.bad {
+    background: var(--paper-deep);
+    border: 1px solid var(--paper-edge);
+  }
+  .vs-panel.bad::after {
+    content: ""; position: absolute; inset: 0;
+    background-image: repeating-linear-gradient(135deg, transparent 0 9px, rgba(201,72,47,.05) 9px 10px);
+    pointer-events: none;
+  }
+  .vs-panel.good {
+    background: var(--green-deep);
+    color: var(--paper);
+    border: 1px solid var(--green);
+    box-shadow: 0 20px 50px -25px rgba(13,90,61,.5);
+  }
+  .vs-panel.good .label-s { color: var(--green-glow); }
+  .vs-panel.good h4 { color: var(--paper); }
+  .vs-panel.good ul li { color: rgba(239,230,209,.85); }
+  .vs-panel.good ul li::before { color: var(--green-glow); }
+  .vs-panel .label-s { margin-bottom: 1rem; }
+  .vs-panel .glyph {
+    font-family: var(--serif); font-style: italic; font-size: 96px; line-height: 1;
+    margin-bottom: 1rem;
+  }
+  .vs-panel.bad .glyph { color: var(--hot); }
+  .vs-panel.good .glyph { color: var(--green-glow); }
+  .vs-panel h4 {
+    font-family: var(--serif); font-size: 28px; font-weight: 400;
+    font-style: italic;
+    line-height: 1.05; margin-bottom: 1rem;
+    letter-spacing: -0.01em;
+  }
+  .vs-panel ul li {
+    padding-left: 1.2em; position: relative;
+    font-size: 14.5px; margin-bottom: 8px; line-height: 1.5;
+  }
+  .vs-panel ul li::before {
+    content: "→"; position: absolute; left: 0;
+    color: var(--ink-mute);
+    font-family: var(--serif);
+  }
+  .vs-arrow {
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-style: italic;
+    font-size: 64px; color: var(--green); line-height: 1;
+  }
+
+  /* === STAT BLOCKS === */
+  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3vw; }
+  .stat { border-top: 2px solid var(--ink); padding-top: 1.1rem; position: relative; }
+  .stat::before {
+    content: ""; position: absolute; top: -2px; left: 0; width: 30px; height: 2px;
+    background: var(--green);
+  }
+  .stat .big {
+    font-family: var(--serif); font-weight: 400;
+    font-size: clamp(56px, 7vw, 100px); line-height: .92;
+    letter-spacing: -0.025em; color: var(--ink);
+  }
+  .stat .big em { color: var(--green); font-style: italic; }
+  .stat .cap { font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: .6rem; }
+  .stat p { margin-top: .7rem; font-size: 14.5px; }
+
+  /* === CLOSING === */
+  .closing { justify-content: center; align-items: flex-start; }
+  .closing .next-list { margin-top: 2.4rem; }
+  .closing .next-list li {
+    font-family: var(--serif); font-size: clamp(24px, 2.8vw, 40px);
+    line-height: 1.2; padding: .9rem 0;
+    border-bottom: 1px solid var(--ink-faint);
+    color: var(--ink); font-weight: 400;
+    letter-spacing: -0.01em;
+    font-style: italic;
+    transition: padding-left .25s, color .25s;
+  }
+  .closing .next-list li:hover { padding-left: 1rem; color: var(--green); }
+  .closing .next-list li::before {
+    content: "→ "; color: var(--green); font-style: normal;
+    margin-right: .4em;
+  }
+  .closing .next-list li b { font-style: normal; font-family: var(--sans); font-weight: 600; color: var(--green); }
+
+  /* === THANKS === */
+  .thanks {
+    justify-content: center;
+    align-items: flex-start;
+    background: var(--green-deep);
+    color: var(--paper);
+    position: relative;
+    overflow: hidden;
+  }
+  .thanks::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(80% 60% at 30% 30%, rgba(125,232,168,.18), transparent 60%),
+      radial-gradient(60% 50% at 80% 90%, rgba(45,167,101,.3), transparent 60%);
+  }
+  .thanks > * { position: relative; z-index: 1; }
+  .thanks h1 {
+    font-family: var(--serif); font-weight: 400;
+    font-size: clamp(80px, 14vw, 220px);
+    line-height: .9; letter-spacing: -0.025em;
+    color: var(--paper);
+  }
+  .thanks h1 em { font-style: italic; color: var(--green-glow); }
+  .thanks .meta {
+    margin-top: 3.5rem;
+    display: flex; gap: 2.5rem; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 12px;
+    letter-spacing: .18em; text-transform: uppercase;
+    color: rgba(239,230,209,.55);
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(239,230,209,.2);
+  }
+  .thanks .meta b { color: var(--green-glow); font-weight: 400; }
+
+  /* === INDICE === */
+  .indice-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.6rem 4vw;
+    margin-top: 2rem;
+  }
+  .indice-item {
+    display: grid; grid-template-columns: 80px 1fr;
+    gap: 1.4rem;
+    align-items: baseline;
+    padding: 1.2rem 0;
+    border-top: 1px solid var(--ink-faint);
+    transition: padding-left .2s;
+  }
+  .indice-item:hover { padding-left: .8rem; border-top-color: var(--green); }
+  .indice-item .roman {
+    font-family: var(--serif); font-style: italic;
+    font-size: 40px; color: var(--green); line-height: 1;
+  }
+  .indice-item h4 {
+    font-family: var(--serif); font-weight: 400;
+    font-size: 26px; letter-spacing: -0.01em;
+    color: var(--ink); line-height: 1.05;
+    margin-bottom: .35rem;
+  }
+  .indice-item p { font-size: 14px; line-height: 1.5; }
+
+  /* === MISC inline accents === */
+  mark {
+    background: var(--green-soft);
+    color: var(--green-deep);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+  .text-green { color: var(--green); }
+  .text-hot   { color: var(--hot); }
+  .quote-box {
+    border-left: 3px solid var(--green);
+    padding: 1rem 1.4rem;
+    background: var(--green-tint);
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 17px;
+    color: var(--ink-soft);
+    line-height: 1.45;
+  }
+  .quote-box b {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .2em; text-transform: uppercase;
+    color: var(--green); display: block;
+    margin-bottom: .35rem;
+    font-style: normal; font-weight: 500;
+  }
+
+  .surface {
+    border: 1px solid var(--ink-faint);
+    background: linear-gradient(180deg, var(--paper) 0%, var(--paper-deep) 100%);
+    padding: 2rem 2.2rem;
+    position: relative;
+  }
+  .surface.green {
+    background: var(--green-tint);
+    border-color: var(--green);
+  }
+
+  /* === HELP === */
+  .help {
+    position: fixed; inset: 0;
+    background: rgba(6,53,36,.96);
+    color: var(--paper);
+    z-index: 100;
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 6vw;
+  }
+  .help.show { display: flex; }
+  .help-panel { max-width: 580px; font-family: var(--mono); font-size: 13.5px; line-height: 2; }
+  .help-panel h3 {
+    font-family: var(--serif); font-size: 48px;
+    color: var(--paper); font-weight: 400; font-style: italic;
+    margin-bottom: 2rem; letter-spacing: -0.02em;
+  }
+  .help-panel h3 em { color: var(--green-glow); }
+  .help kbd {
+    display: inline-block;
+    border: 1px solid rgba(239,230,209,.3);
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-family: var(--mono); font-size: 12px;
+    color: var(--paper);
+    margin-right: 8px;
+    background: rgba(255,255,255,.04);
+  }
+
+  /* === RESPONSIVE === */
+  @media (max-width: 980px) {
+    .grid-3, .grid-4, .grid-5-7, .grid-7-5, .indice-grid { grid-template-columns: 1fr; }
+    .row { flex-direction: column; gap: 2rem; }
+    .vs { grid-template-columns: 1fr; }
+    .vs-arrow { transform: rotate(90deg); padding: 0; font-size: 40px; }
+    .stat-row { grid-template-columns: 1fr; }
+    .slide { padding: 5vh 6vw 6vh; }
+    .chapter { padding: 5vh 6vw; }
+    .manifesto { padding: 5vh 6vw; }
+  }
+
+  /* === PRINT === */
+  @media print {
+    @page { size: 1366px 768px; margin: 0; }
+    body { overflow: visible; background: var(--paper); }
+    body::before, body::after { display: none; }
+    .deck { width: auto; height: auto; }
+    .slide {
+      position: relative; inset: auto;
+      display: flex !important;
+      width: 1366px; height: 768px;
+      page-break-after: always;
+      animation: none !important;
+    }
+    .slide .stagger > * { opacity: 1 !important; animation: none !important; }
+    .slide .card { animation: none !important; opacity: 1 !important; }
+    .chrome, .progress, .help { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ CHROME ============ -->
+<div class="chrome top">
+  <span class="mark">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path d="M2 12 Q 2 2 12 2 L 12 5 Q 5 5 5 12 Z" fill="currentColor"/>
+    </svg>
+    WebMCP · Briefing tecnico
+  </span>
+  <span class="counter"><b id="cur">01</b> &nbsp;/&nbsp; <span id="tot">00</span></span>
+</div>
+<div class="chrome bottom">
+  <span>Reply &middot; Maggio 2026 &middot; v2.0</span>
+  <span>
+    <button onclick="go(-1)">◂ Indietro</button>
+    <button onclick="toggleHelp()">?</button>
+    <button onclick="go(1)">Avanti ▸</button>
+  </span>
+</div>
+<div class="progress" id="progress"></div>
+
+<!-- ============ HELP OVERLAY ============ -->
+<div class="help" id="help" onclick="toggleHelp()">
+  <div class="help-panel">
+    <h3>Navigazione <em>tasti</em></h3>
+    <p><kbd>→</kbd> <kbd>Space</kbd> avanti</p>
+    <p><kbd>←</kbd> indietro</p>
+    <p><kbd>Home</kbd> prima slide &nbsp; <kbd>End</kbd> ultima</p>
+    <p><kbd>F</kbd> fullscreen &nbsp; <kbd>P</kbd> stampa / PDF</p>
+    <p><kbd>?</kbd> mostra / nascondi questo pannello</p>
+    <hr style="border:0;border-top:1px solid rgba(239,230,209,.2);margin:1.8rem 0" />
+    <p style="opacity:.55;font-size:11.5px">Click sinistro: indietro &middot; click destro: avanti</p>
+  </div>
+</div>
+
+<!-- ============ DECK ============ -->
+<main class="deck" id="deck">
+
+  <!-- ============================================================ 01 — COVER -->
+  <section class="slide cover">
+    <div class="cover-bloom"></div>
+    <div class="meta-row">
+      <span class="reply">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2 14 Q 2 2 14 2 L 14 6 Q 6 6 6 14 Z" fill="currentColor"/>
+        </svg>
+        Reply &middot; Briefing tecnico
+      </span>
+      <span>2026 · 01 / 27</span>
+    </div>
+    <div class="stagger">
+      <h1>
+        <span class="line-a">Web</span>
+        <span class="line-b">MCP<span class="dot">.</span></span>
+      </h1>
+      <p class="subtitle">Il web programmabile per agenti AI. Una specifica W3C per esporre le funzioni del tuo sito come <em>tool</em> invocabili dal modello — senza scraping, senza screenshot.</p>
+    </div>
+    <div class="tag">
+      <span>W3C Draft &middot; 10 feb 2026</span>
+      <span>Chrome 146 Canary</span>
+      <span>Per manager &amp; clienti</span>
+    </div>
+  </section>
+
+  <!-- ============================================================ 02 — INDICE -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">02</span><span class="dot"></span>Indice</div>
+      <h2>La mappa del <em>briefing</em>.</h2>
+      <div class="indice-grid">
+        <div class="indice-item">
+          <span class="roman">I</span>
+          <div>
+            <h4>Cos'è WebMCP</h4>
+            <p>Definizione, origine, stato della specifica W3C.</p>
+          </div>
+        </div>
+        <div class="indice-item">
+          <span class="roman">II</span>
+          <div>
+            <h4>Perché serve</h4>
+            <p>Il problema di DOM scraping e screenshot. Confronto con MCP classico.</p>
+          </div>
+        </div>
+        <div class="indice-item">
+          <span class="roman">III</span>
+          <div>
+            <h4>Come funziona</h4>
+            <p>L'API <code>navigator.modelContext</code> e la mediazione utente.</p>
+          </div>
+        </div>
+        <div class="indice-item">
+          <span class="roman">IV</span>
+          <div>
+            <h4>Dove crea valore</h4>
+            <p>E-commerce, SaaS B2B, support, accessibilità, internal tools.</p>
+          </div>
+        </div>
+        <div class="indice-item">
+          <span class="roman">V</span>
+          <div>
+            <h4>Come si fa</h4>
+            <p>Implementazione da zero e su un sito già esistente.</p>
+          </div>
+        </div>
+        <div class="indice-item">
+          <span class="roman">VI</span>
+          <div>
+            <h4>Cosa pesare</h4>
+            <p>Vantaggi, rischi, supporto, roadmap di sperimentazione.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 03 — PROLOGUE / MANIFESTO -->
+  <section class="slide manifesto dark">
+    <div class="stagger">
+      <div class="marker">Prologo</div>
+      <p class="quote">Il web non si <span class="strike">guarda</span>. <em>Si invoca.</em></p>
+      <div class="attribution">Una nuova superficie d'interazione per gli agenti AI &middot; W3C Web Machine Learning Community Group · 2026</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 04 — DIVIDER I -->
+  <section class="slide chapter dark">
+    <span class="corner-num">Capitolo · 06</span>
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">04</span><span class="dot"></span>Capitolo I</div>
+      <h2>Che cos'è, <em>davvero</em>.</h2>
+      <div class="descriptor">Definizione, genealogia, stato della specifica. Tre slide per capire di cosa stiamo parlando — e perché non è l'ennesimo hype.</div>
+      <div class="roman">I</div>
+    </div>
+    <div class="leaf"><svg viewBox="0 0 400 400" fill="none"><path d="M 50 350 Q 50 50 350 50 L 350 130 Q 130 130 130 350 Z" fill="var(--green)" opacity=".5"/></svg></div>
+  </section>
+
+  <!-- ============================================================ 05 — COS'È -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">05</span><span class="dot"></span>Capitolo I · Definizione</div>
+      <h2>Un sito che <em>parla</em> all'agente,<br/>invece di farsi guardare.</h2>
+      <div class="grid-5-7" style="margin-top:1rem">
+        <div>
+          <p class="lead"><em>WebMCP</em> permette a qualsiasi sito di esporre le proprie funzionalità come <em>tool</em> richiamabili da agenti AI direttamente nel browser.</p>
+        </div>
+        <div>
+          <p style="font-size:16.5px">Il sito dichiara cosa sa fare — <i>"aggiungi al carrello"</i>, <i>"crea ticket"</i>, <i>"cerca cliente"</i> — tramite un'API JavaScript. L'agente (Claude, Copilot, Gemini, qualunque LLM connesso al browser) invoca quei tool con parametri tipizzati.</p>
+          <p style="font-size:16.5px;margin-top:1.2rem">Nessun DOM scraping. Nessuno screenshot da interpretare. Nessuna automazione fragile che si rompe al primo redesign.</p>
+          <div style="margin-top:2rem;display:flex;gap:.6rem;flex-wrap:wrap">
+            <span class="pill solid">Standard W3C</span>
+            <span class="pill green">Lato client</span>
+            <span class="pill">Eredita sessione browser</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 06 — ORIGINE -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">06</span><span class="dot"></span>Capitolo I · Origine</div>
+      <h2>Da dove <em>arriva</em>.</h2>
+      <p class="lead" style="max-width:50ch;margin-bottom:0">Sviluppato nel W3C Web Machine Learning Community Group con editori da <em>Google</em> e <em>Microsoft</em>. Risposta diretta all'esplosione degli agenti e ai limiti del DOM scraping.</p>
+
+      <div class="grid-4" style="margin-top:3.5rem">
+        <div class="surface">
+          <div class="label-s">Genealogia</div>
+          <h3 style="margin-top:.6rem;font-style:italic">MCP-B</h3>
+          <p style="font-size:14.5px">Prototipo community, poi adottato dalla CG W3C e rinominato WebMCP.</p>
+        </div>
+        <div class="surface">
+          <div class="label-s">10 Feb 2026</div>
+          <h3 style="margin-top:.6rem;font-style:italic">Draft CGR</h3>
+          <p style="font-size:14.5px">W3C Community Group Report. Non ancora Standards Track, ma direzione consolidata.</p>
+        </div>
+        <div class="surface">
+          <div class="label-s">Mar 2026</div>
+          <h3 style="margin-top:.6rem;font-style:italic">Chrome 146</h3>
+          <p style="font-size:14.5px">Canary, early preview dietro flag. Programma EPP per testarlo su prodotti reali.</p>
+        </div>
+        <div class="surface green">
+          <div class="label-s" style="color:var(--green)">Oggi</div>
+          <h3 style="margin-top:.6rem;font-style:italic;color:var(--green)">Polyfill</h3>
+          <p style="font-size:14.5px"><code>@mcp-b/global</code> + SDK React/TS pronti per produzione, ovunque.</p>
+        </div>
+      </div>
+
+      <div class="end" style="margin-top:auto;padding-top:2rem">
+        <div class="quote-box" style="max-width:80ch">
+          <b>Nota</b>
+          La specifica è in evoluzione: alcuni dettagli dell'API possono cambiare prima dello Standards Track. La direzione, però, è consolidata e già usabile in produzione tramite polyfill.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 07 — DIVIDER II -->
+  <section class="slide chapter dark">
+    <span class="corner-num">Capitolo · II / 06</span>
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">07</span><span class="dot"></span>Capitolo II</div>
+      <h2>Perché <em>serve</em>.</h2>
+      <div class="descriptor">Il problema che gli agenti hanno con il web di oggi. E come WebMCP lo riscrive a partire dalla superficie.</div>
+      <div class="roman">II</div>
+    </div>
+    <div class="leaf"><svg viewBox="0 0 400 400" fill="none"><path d="M 50 350 Q 50 50 350 50 L 350 130 Q 130 130 130 350 Z" fill="var(--green)" opacity=".5"/></svg></div>
+  </section>
+
+  <!-- ============================================================ 08 — IL PROBLEMA -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">08</span><span class="dot"></span>Capitolo II · Il problema</div>
+      <h2>Oggi gli agenti <span class="strike">vedono</span> il web come un umano. <em>Male.</em></h2>
+      <div class="vs">
+        <div class="vs-panel bad">
+          <div class="label-s">Approccio attuale</div>
+          <div class="glyph">▥</div>
+          <h4>DOM scraping &amp; vision</h4>
+          <ul>
+            <li>Screenshot e accessibility tree nel contesto del modello</li>
+            <li>Token costo enorme · latenza alta</li>
+            <li>Si rompe al primo redesign o A/B test</li>
+            <li>Ambiguità su quale bottone cliccare</li>
+            <li>Auth fragile, captcha, anti-bot</li>
+            <li>Nessuna semantica: il modello "indovina"</li>
+          </ul>
+        </div>
+        <div class="vs-arrow">→</div>
+        <div class="vs-panel good">
+          <div class="label-s">Con WebMCP</div>
+          <div class="glyph">◉</div>
+          <h4>Tool invocation strutturato</h4>
+          <ul>
+            <li>Il sito dichiara <code>add_to_cart(sku, qty)</code></li>
+            <li>JSON Schema sui parametri · zero ambiguità</li>
+            <li>Riusa la logica del frontend, non la sua UI</li>
+            <li>Sopravvive a qualsiasi redesign</li>
+            <li>Eredita cookie / SSO / CSRF della sessione</li>
+            <li>Conferma esplicita per azioni distruttive</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 09 — MCP vs WebMCP -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">09</span><span class="dot"></span>Capitolo II · Posizionamento</div>
+      <h2>MCP <em>vs</em> WebMCP.</h2>
+      <p class="lead" style="max-width:54ch;margin-bottom:2rem">WebMCP non sostituisce MCP. È una <em>superficie</em> diversa per esporre tool al modello quando l'utente è già nel browser.</p>
+
+      <table class="compare">
+        <thead>
+          <tr>
+            <th></th>
+            <th>MCP &middot; Anthropic, 2024</th>
+            <th class="web">WebMCP &middot; W3C, 2026</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Trasporto</td><td>JSON-RPC su stdio / HTTP</td><td class="web"><code>navigator.modelContext</code></td></tr>
+          <tr><td>Dove gira</td><td>Server, locale o hosted</td><td class="web">Lato client, dentro la pagina</td></tr>
+          <tr><td>Stato &amp; sessione</td><td>Server mantiene contesto</td><td class="web">La pagina viva <em>è</em> il contesto</td></tr>
+          <tr><td>Autenticazione</td><td>Gestita dal server MCP</td><td class="web">Eredita cookie / SSO del browser</td></tr>
+          <tr><td>Discovery</td><td>Catalogo MCP o config client</td><td class="web">Tool della pagina che l'utente sta visitando</td></tr>
+          <tr><td>Caso tipico</td><td>"Apri Jira e creami il ticket"</td><td class="web">"Sono nel tuo SaaS — agisci qui"</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================================================ 10 — DIVIDER III -->
+  <section class="slide chapter dark">
+    <span class="corner-num">Capitolo · III / 06</span>
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">10</span><span class="dot"></span>Capitolo III</div>
+      <h2>Come <em>funziona</em>.</h2>
+      <div class="descriptor">Un singolo punto d'ingresso, quattro campi, mediazione utente nativa. La spec è sorprendentemente piccola.</div>
+      <div class="roman">III</div>
+    </div>
+    <div class="leaf"><svg viewBox="0 0 400 400" fill="none"><path d="M 50 350 Q 50 50 350 50 L 350 130 Q 130 130 130 350 Z" fill="var(--green)" opacity=".5"/></svg></div>
+  </section>
+
+  <!-- ============================================================ 11 — API -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">11</span><span class="dot"></span>Capitolo III · L'API</div>
+      <h2><code style="font-family:var(--mono);font-size:.65em">navigator.modelContext</code>. <em>Tutto qui.</em></h2>
+      <div class="grid-5-7" style="margin-top:1rem">
+        <div style="max-width:38ch">
+          <p style="font-size:16.5px">Un singolo punto d'ingresso nel browser. La pagina registra una lista di tool; ognuno dichiara <b style="font-family:var(--serif);font-style:italic;color:var(--ink)">nome</b>, <b style="font-family:var(--serif);font-style:italic;color:var(--ink)">descrizione</b>, <b style="font-family:var(--serif);font-style:italic;color:var(--ink)">input schema</b> e una funzione <b style="font-family:var(--serif);font-style:italic;color:var(--ink)">execute</b>.</p>
+          <hr class="rule" />
+          <div class="label-s" style="margin-bottom:.8rem">Metodi principali</div>
+          <ul style="font-size:14.5px;line-height:1.95">
+            <li>· <code>provideContext({ tools })</code> — registra l'intera lista</li>
+            <li>· <code>registerTool(tool)</code> — aggiunge un tool</li>
+            <li>· <code>unregisterTool(name)</code> — rimuove un tool</li>
+          </ul>
+          <hr class="rule" />
+          <p style="font-size:14px;color:var(--ink-mute);font-style:italic;font-family:var(--serif);font-size:17px">Le invocazioni sono serializzate sul main thread: lo stato UI resta sincronizzato con ciò che l'agente osserva.</p>
+        </div>
+        <div>
+<pre data-lang="javascript"><span class="c">// Esempio minimo dalla spec W3C</span>
+<span class="k">if</span> (<span class="s">"modelContext"</span> <span class="k">in</span> window.navigator) {
+  navigator.modelContext.<span class="f">provideContext</span>({
+    <span class="n">tools</span>: [{
+      <span class="n">name</span>: <span class="s">"add-stamp"</span>,
+      <span class="n">description</span>: <span class="s">"Aggiungi un francobollo alla collezione"</span>,
+      <span class="n">inputSchema</span>: {
+        <span class="n">type</span>: <span class="s">"object"</span>,
+        <span class="n">properties</span>: {
+          <span class="n">name</span>:  { <span class="n">type</span>: <span class="s">"string"</span> },
+          <span class="n">year</span>:  { <span class="n">type</span>: <span class="s">"number"</span> }
+        },
+        <span class="n">required</span>: [<span class="s">"name"</span>, <span class="s">"year"</span>]
+      },
+      <span class="k">async</span> <span class="f">execute</span>({ name, year }, agent) {
+        <span class="f">addStamp</span>(name, year);
+        <span class="k">return</span> {
+          <span class="n">content</span>: [{
+            <span class="n">type</span>: <span class="s">"text"</span>,
+            <span class="n">text</span>: <span class="s">"Stamp added!"</span>
+          }]
+        };
+      }
+    }]
+  });
+}</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 12 — MEDIAZIONE -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">12</span><span class="dot"></span>Capitolo III · Mediazione</div>
+      <h2>L'utente <em>sempre</em> nel loop, quando conta.</h2>
+      <div class="grid-5-7" style="margin-top:1rem">
+        <div style="max-width:42ch">
+          <p style="font-size:16.5px">Ogni <code>execute</code> riceve un secondo argomento <code>agent</code> che espone <code>requestUserInteraction()</code>.</p>
+          <p style="font-size:16.5px;margin-top:1rem">Da usare per <b style="font-family:var(--serif);font-style:italic;color:var(--green)">conferme esplicite</b> su azioni:</p>
+          <ul style="font-size:15px;line-height:1.95;margin-top:.5rem">
+            <li>· finanziarie (pagamenti, rimborsi)</li>
+            <li>· distruttive (eliminazioni, cancellazioni)</li>
+            <li>· con effetti su terzi (mail, notifiche)</li>
+            <li>· su dati sensibili (PII, contratti)</li>
+          </ul>
+          <div class="quote-box" style="margin-top:1.5rem">
+            <b>Principio</b>
+            Tutto ciò che un utente prudente non automatizzerebbe va dietro <code>requestUserInteraction</code>.
+          </div>
+        </div>
+        <div>
+<pre data-lang="javascript"><span class="c">// Pagamento con conferma esplicita</span>
+{
+  <span class="n">name</span>: <span class="s">"checkout"</span>,
+  <span class="n">description</span>: <span class="s">"Completa l'acquisto del carrello"</span>,
+  <span class="n">inputSchema</span>: { <span class="c">/* ... */</span> },
+  <span class="k">async</span> <span class="f">execute</span>({ paymentMethod }, agent) {
+    <span class="k">const</span> total = <span class="f">getCartTotal</span>();
+
+    <span class="k">const</span> ok = <span class="k">await</span> agent.<span class="f">requestUserInteraction</span>(
+      <span class="k">async</span> () =&gt; <span class="f">confirm</span>(
+        <span class="s">`Vuoi pagare €</span>${total}<span class="s">?`</span>
+      )
+    );
+
+    <span class="k">if</span> (!ok) <span class="k">return</span> {
+      <span class="n">content</span>: [{ <span class="n">type</span>: <span class="s">"text"</span>,
+        <span class="n">text</span>: <span class="s">"Annullato dall'utente"</span> }]
+    };
+
+    <span class="k">return</span> <span class="k">await</span> <span class="f">processPayment</span>(paymentMethod);
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 13 — DIVIDER IV -->
+  <section class="slide chapter dark">
+    <span class="corner-num">Capitolo · IV / 06</span>
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">13</span><span class="dot"></span>Capitolo IV</div>
+      <h2>Dove crea <em>valore</em>.</h2>
+      <div class="descriptor">Otto casi d'uso ad alto impatto, mappati su settori che già spendono in agent automation: commerce, SaaS B2B, customer support, accessibilità, internal tools.</div>
+      <div class="roman">IV</div>
+    </div>
+    <div class="leaf"><svg viewBox="0 0 400 400" fill="none"><path d="M 50 350 Q 50 50 350 50 L 350 130 Q 130 130 130 350 Z" fill="var(--green)" opacity=".5"/></svg></div>
+  </section>
+
+  <!-- ============================================================ 14 — CASI USO 1 -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">14</span><span class="dot"></span>Capitolo IV · Dove crea valore (1/2)</div>
+      <h2>Casi d'uso ad <em>alto</em> impatto.</h2>
+      <div class="grid-2" style="margin-top:1.5rem">
+        <div class="card numbered" data-n="01 · E-COMMERCE">
+          <div class="icon">$</div>
+          <h4><em>Commerce</em> conversazionale end-to-end</h4>
+          <p>Tool: <code>search_products</code>, <code>add_to_cart</code>, <code>apply_coupon</code>, <code>checkout</code>. L'agente completa ordini multi-step senza simulare click. Conferma utente su pagamenti via <code>requestUserInteraction</code>.</p>
+          <p style="margin-top:.9rem;color:var(--green);font-style:italic;font-family:var(--serif);font-size:17px">→ Conversion rate su sessioni assistite, riduzione cart abandonment.</p>
+        </div>
+        <div class="card alt numbered" data-n="02 · SAAS B2B">
+          <div class="icon">▤</div>
+          <h4>Dashboard SaaS che <em>parlano</em></h4>
+          <p>CRM, project management, billing, analytics, ITSM. L'agente traduce l'intento in operazioni strutturate: <em>"crea opportunità da 50k per ACME, chiusura Q3"</em>. Riduce la curva di apprendimento di tool enterprise (Salesforce, AWS, Jira).</p>
+          <p style="margin-top:.9rem;color:var(--green);font-style:italic;font-family:var(--serif);font-size:17px">→ Time-to-value su nuovi utenti, ticket di supporto in calo.</p>
+        </div>
+        <div class="card alt numbered" data-n="03 · SUPPORT">
+          <div class="icon">⚑</div>
+          <h4>Self-service che <em>chiude</em> i casi</h4>
+          <p>Tool: <code>get_order_status</code>, <code>start_return</code>, <code>update_address</code>, <code>escalate_to_human</code>. L'agente esegue flussi che oggi richiedono un operatore, con audit trail e consenso esplicito su ogni azione irreversibile.</p>
+          <p style="margin-top:.9rem;color:var(--green);font-style:italic;font-family:var(--serif);font-size:17px">→ Deflection rate, MTTR sui ticket di primo livello.</p>
+        </div>
+        <div class="card numbered" data-n="04 · TRAVEL">
+          <div class="icon">✈</div>
+          <h4>Booking <em>strutturato</em></h4>
+          <p>Tool: <code>search_flights</code>, <code>hold_seat</code>, <code>confirm_booking</code>. Combina sessione utente (preferenze, miglia, payment methods) con esecuzione strutturata e verifiche pre-pagamento.</p>
+          <p style="margin-top:.9rem;color:var(--green);font-style:italic;font-family:var(--serif);font-size:17px">→ Riduzione drop-off in fasi check-out complesse.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 15 — CASI USO 2 -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">15</span><span class="dot"></span>Capitolo IV · Dove crea valore (2/2)</div>
+      <h2>Casi d'uso meno <em>ovvi</em>, alto valore.</h2>
+      <div class="grid-2" style="margin-top:1.5rem">
+        <div class="card alt numbered" data-n="05 · ACCESSIBILITÀ">
+          <div class="icon">◐</div>
+          <h4>Interfacce <em>parlate</em>, non interpretate</h4>
+          <p>Le tecnologie assistive ricevono azioni di alto livello (<code>add_to_cart</code>) invece di "clicca questo bottone". Un assistente vocale può guidare anche app difficili da navigare con accessibility tree tradizionale.</p>
+          <p style="margin-top:.9rem;color:var(--ink-mute);font-size:13px"><b style="color:var(--ink)">Caveat:</b> WebMCP affianca, non sostituisce, l'accessibilità tradizionale.</p>
+        </div>
+        <div class="card numbered" data-n="06 · INTERNAL">
+          <div class="icon">⊞</div>
+          <h4>Automazioni interne &amp; <em>userscript AI</em></h4>
+          <p>L'estensione WebMCP raccoglie tool dalle tab aperte e li espone a Claude Desktop. Flussi tipo: <em>"aggrega dati da queste 3 dashboard interne e mandami un riassunto"</em>. Riduce drasticamente il costo di integrazioni custom.</p>
+          <p style="margin-top:.9rem;color:var(--green);font-style:italic;font-family:var(--serif);font-size:17px">→ Tempo speso in copia-incolla, errori manuali.</p>
+        </div>
+        <div class="card numbered" data-n="07 · FINANCE / PA">
+          <div class="icon">€</div>
+          <h4>Finanza e <em>Pubblica Amministrazione</em></h4>
+          <p>Categorizzazione transazioni, generazione report, esportazione CSV — con <code>requestUserInteraction</code> su qualsiasi movimento. Per PA: pratiche, scadenze, modulistica con tracciabilità nativa.</p>
+        </div>
+        <div class="card alt numbered" data-n="08 · TESTING / DEV">
+          <div class="icon">⌘</div>
+          <h4>Test E2E aumentati &amp; <em>dev tools</em></h4>
+          <p>Tool WebMCP usati come <em>hook deterministici</em> da framework di testing. IDE web (StackBlitz, CodeSandbox) e DevTools espongono <code>run_cell</code>, <code>format_code</code>, <code>open_file</code> invece di simulare scorciatoie.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 16 — STATEMENT / STRATEGY -->
+  <section class="slide manifesto">
+    <div class="stagger">
+      <div class="marker">Implicazione strategica</div>
+      <p class="quote">Chi non espone tool oggi, sarà <em>invisibile</em> agli agenti di domani.</p>
+      <div class="attribution">Il valore si sposta su <b>dominio</b> e <b>accesso privilegiato ai dati</b>. La UI proprietaria, da sola, smette di essere una barriera competitiva.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 17 — DIVIDER V -->
+  <section class="slide chapter dark">
+    <span class="corner-num">Capitolo · V / 06</span>
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">17</span><span class="dot"></span>Capitolo V</div>
+      <h2>Come si <em>fa</em>.</h2>
+      <div class="descriptor">Due percorsi: progettare un prodotto agent-first da zero, oppure incrementare un sito esistente con un approccio wrapper, senza rewrite.</div>
+      <div class="roman">V</div>
+    </div>
+    <div class="leaf"><svg viewBox="0 0 400 400" fill="none"><path d="M 50 350 Q 50 50 350 50 L 350 130 Q 130 130 130 350 Z" fill="var(--green)" opacity=".5"/></svg></div>
+  </section>
+
+  <!-- ============================================================ 18 — IMPL DA ZERO -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">18</span><span class="dot"></span>Capitolo V · Implementazione (1/2)</div>
+      <h2>Da <em>zero</em>: nuovo prodotto, design agent-first.</h2>
+      <div class="grid-5-7" style="margin-top:1rem">
+        <div style="max-width:42ch">
+          <ol class="steps">
+            <li><b>Mappa le intenzioni</b><span>Per ogni feature, scrivi la frase che un utente direbbe ad alta voce. Quella è la firma del tool.</span></li>
+            <li><b>Definisci la tool surface</b><span>5–10 tool al massimo. Granularità "intent", non "click". Nomi verbo-oggetto.</span></li>
+            <li><b>Schema first</b><span>JSON Schema per input e output. Tipi stretti, enum dove possibile, descrizioni ricche.</span></li>
+            <li><b>Implementa execute</b><span>Stessa logica del frontend, esposta via <code>navigator.modelContext</code>. Niente duplicazione.</span></li>
+            <li><b>Conferme</b><span>Ogni side-effect non reversibile dietro <code>requestUserInteraction</code>.</span></li>
+            <li><b>Tool surface policy</b><span>Documento interno: cosa esponiamo, a chi, con quali conferme. Vive col prodotto.</span></li>
+          </ol>
+        </div>
+        <div>
+<pre data-lang="react · @mcp-b/react-webmcp"><span class="k">import</span> { useWebMCP } <span class="k">from</span> <span class="s">"@mcp-b/react-webmcp"</span>;
+
+<span class="k">export function</span> <span class="f">ProductSearch</span>() {
+  <span class="k">const</span> [results, setResults] = <span class="f">useState</span>([]);
+
+  <span class="f">useWebMCP</span>({
+    <span class="n">name</span>: <span class="s">"search-products"</span>,
+    <span class="n">description</span>:
+      <span class="s">"Cerca prodotti per query e categoria"</span>,
+    <span class="n">inputSchema</span>: {
+      <span class="n">type</span>: <span class="s">"object"</span>,
+      <span class="n">properties</span>: {
+        <span class="n">query</span>:    { <span class="n">type</span>: <span class="s">"string"</span> },
+        <span class="n">category</span>: { <span class="n">type</span>: <span class="s">"string"</span>,
+                     <span class="n">enum</span>: [<span class="s">"shoes"</span>, <span class="s">"bags"</span>,
+                            <span class="s">"apparel"</span>] }
+      },
+      <span class="n">required</span>: [<span class="s">"query"</span>]
+    },
+    <span class="n">execute</span>: <span class="k">async</span> ({ query, category }) =&gt; {
+      <span class="k">const</span> data = <span class="k">await</span> <span class="f">runSearch</span>(query, category);
+      <span class="f">setResults</span>(data);
+      <span class="k">return</span> { <span class="n">content</span>: [{ <span class="n">type</span>: <span class="s">"text"</span>,
+        <span class="n">text</span>: <span class="s">`Trovati </span>${data.length}<span class="s">`</span> }] };
+    }
+  });
+
+  <span class="k">return</span> &lt;<span class="f">ResultsList</span> items={results} /&gt;;
+}</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 19 — IMPL SITO ESISTENTE -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">19</span><span class="dot"></span>Capitolo V · Implementazione (2/2)</div>
+      <h2>Su un sito <em>già</em> in essere. Bottom-up.</h2>
+      <div class="grid-7-5" style="margin-top:1rem">
+        <div style="max-width:46ch">
+          <p style="font-size:17px;margin-bottom:1.8rem">L'approccio incrementale: una <b style="font-family:var(--serif);font-style:italic;color:var(--green)">feature ad alto traffico</b>, 2–3 tool, misurare, espandere. Nessun rewrite.</p>
+          <ol class="steps">
+            <li><b>Audit del flusso target</b><span>Trova il flusso con drop-off alto o ticket di support frequenti. È lì che WebMCP ripaga subito.</span></li>
+            <li><b>Identifica i punti di chiamata</b><span>Quali funzioni JS già esistono dietro i bottoni? Spesso il tool è una riga: stesso codice, nuovo wrapper.</span></li>
+            <li><b>Inietta il polyfill</b><span><code>@mcp-b/global</code> in tutte le pagine. Carica solo se <code>modelContext</code> non è nativo.</span></li>
+            <li><b>Registra 2–3 tool pilota</b><span>Idealmente read-only prima (search, get_status). Costo basso, valore visibile, rischio minimo.</span></li>
+            <li><b>Espandi su write con conferme</b><span>Side-effect dietro <code>requestUserInteraction</code> finché il pattern si stabilizza.</span></li>
+            <li><b>Strumenta &amp; misura</b><span>Audit trail: chi chiama cosa, con quali parametri, esito. Per security e per prodotto.</span></li>
+          </ol>
+        </div>
+        <div>
+          <div class="surface green">
+            <div class="label-s" style="margin-bottom:1.2rem;color:var(--green)">Pattern di adozione</div>
+            <h3 style="font-family:var(--serif);font-size:34px;font-weight:400;font-style:italic;margin-bottom:.9rem;color:var(--green);line-height:1">Wrapper,<br/>non rewrite.</h3>
+            <p style="font-size:15px;margin-bottom:1.4rem">I tool WebMCP sono <em>guscio</em> sopra il codice esistente: chiamano gli stessi servizi, gli stessi reducer, gli stessi endpoint che il bottone della UI già chiama.</p>
+            <hr class="rule" style="border-color:var(--green-soft)" />
+            <div class="label-s" style="margin-bottom:.8rem;color:var(--green)">Decisioni chiave</div>
+            <ul style="font-size:14.5px;line-height:1.9">
+              <li>· Stessa business logic UI/agente</li>
+              <li>· Granularità intent, non click</li>
+              <li>· Allowlist domini se necessario</li>
+              <li>· CSP/CORS invariati: gira lato client</li>
+              <li>· Versionare la tool surface (semver)</li>
+            </ul>
+            <hr class="rule" style="border-color:var(--green-soft)" />
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+              <span class="pill solid">2–3 settimane</span>
+              <span class="pill green">Per pilot feature</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 20 — DIVIDER VI -->
+  <section class="slide chapter dark">
+    <span class="corner-num">Capitolo · VI / 06</span>
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">20</span><span class="dot"></span>Capitolo VI</div>
+      <h2>Cosa <em>pesare</em>.</h2>
+      <div class="descriptor">Vantaggi, rischi reali, stato del supporto, roadmap di sperimentazione. Onestamente. Quanto vale, dove si rompe, come iniziare.</div>
+      <div class="roman">VI</div>
+    </div>
+    <div class="leaf"><svg viewBox="0 0 400 400" fill="none"><path d="M 50 350 Q 50 50 350 50 L 350 130 Q 130 130 130 350 Z" fill="var(--green)" opacity=".5"/></svg></div>
+  </section>
+
+  <!-- ============================================================ 21 — VANTAGGI -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">21</span><span class="dot"></span>Capitolo VI · Perché conviene</div>
+      <h2>I quattro <em>vantaggi</em> che pagano da soli il progetto.</h2>
+      <div class="stat-row" style="margin-top:3rem">
+        <div class="stat">
+          <div class="cap">Affidabilità</div>
+          <div class="big"><em>0</em> brittleness</div>
+          <p>Niente inferenza su HTML o screenshot. Il tool sopravvive a qualsiasi redesign. Nessun selettore CSS che si rompe il venerdì sera.</p>
+        </div>
+        <div class="stat">
+          <div class="cap">Token efficiency</div>
+          <div class="big">−<em>90%</em> contesto</div>
+          <p>Niente accessibility tree o screenshot nel prompt. Solo lista tool e parametri. Costi modello in caduta, latenza crollata.</p>
+        </div>
+        <div class="stat">
+          <div class="cap">Riuso codice</div>
+          <div class="big"><em>1</em> sorgente</div>
+          <p>Stessa logica del frontend. Stessi servizi, stessi reducer. Una sola business logic da mantenere per UI umana e UI agentica.</p>
+        </div>
+      </div>
+      <div class="end" style="margin-top:auto;padding-top:2.5rem">
+        <hr class="rule full" />
+        <div class="grid-2" style="gap:4vw;margin-top:1.5rem">
+          <div>
+            <div class="label-s" style="margin-bottom:.7rem;color:var(--green)">Quarto vantaggio · Sicurezza</div>
+            <p style="font-size:16px"><b style="font-family:var(--serif);font-size:24px;color:var(--ink);font-style:italic">L'esecuzione resta nel sandbox del sito.</b> Eredita auth, CSP, CORS, rate limit. Niente credenziali da gestire fuori dal browser.</p>
+          </div>
+          <div>
+            <div class="label-s" style="margin-bottom:.7rem;color:var(--green)">Bonus · Strategico</div>
+            <p style="font-size:16px"><b style="font-family:var(--serif);font-size:24px;color:var(--ink);font-style:italic">Posizionamento "agent-ready".</b> Effetto analogo a structured data per la SEO classica — <em>AEO, Agent Experience Optimization</em>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 22 — RISCHI -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">22</span><span class="dot"></span>Capitolo VI · Rischi &amp; mitigazioni</div>
+      <h2>Cosa <em>tenere</em> d'occhio. Onestamente.</h2>
+      <div class="grid-3" style="margin-top:1.5rem">
+        <div class="card hot-card numbered" data-n="RISCHIO · 01">
+          <div class="icon">!</div>
+          <h4><em>Tool poisoning</em></h4>
+          <p>La <em>descrizione</em> del tool entra nel contesto del modello. Una descrizione malevola può iniettare istruzioni. Anche schema e nomi sono prompt potenziali.</p>
+          <hr class="rule" />
+          <div class="label-s" style="color:var(--green);margin-bottom:.5rem">Mitigazione</div>
+          <p style="font-size:13.5px">Code review delle descrizioni come del codice. Linting su pattern sospetti. Allowlist se la pagina include UGC.</p>
+        </div>
+        <div class="card hot-card numbered" data-n="RISCHIO · 02">
+          <div class="icon">!</div>
+          <h4><em>Confused deputy</em></h4>
+          <p>L'agente può essere indotto da contenuti di terze parti (commenti, prodotti, email mostrate in pagina) a invocare tool sensibili a nome dell'utente.</p>
+          <hr class="rule" />
+          <div class="label-s" style="color:var(--green);margin-bottom:.5rem">Mitigazione</div>
+          <p style="font-size:13.5px"><code>requestUserInteraction</code> su tutto ciò che è distruttivo, finanziario o lato terzi. Audit log con prompt originale.</p>
+        </div>
+        <div class="card hot-card numbered" data-n="RISCHIO · 03">
+          <div class="icon">!</div>
+          <h4>Consenso <em>utente</em></h4>
+          <p>La spec attuale lascia la "trust decision" al sito stesso. Manca per ora un meccanismo standard: <em>"il sito X vuole esporre N tool al tuo agente, autorizzi?"</em></p>
+          <hr class="rule" />
+          <div class="label-s" style="color:var(--green);margin-bottom:.5rem">Mitigazione</div>
+          <p style="font-size:13.5px">Banner first-party che annuncia la disponibilità di tool agentici. Opt-in esplicito per categorie sensibili.</p>
+        </div>
+      </div>
+      <div class="end" style="margin-top:auto;padding-top:2rem">
+        <div class="quote-box" style="max-width:90ch">
+          <b>Postura consigliata</b>
+          <em>Least privilege</em> sui tool, allowlist degli agenti dove possibile, log strutturati di ogni invocazione, conferma umana sintetizzata su azioni non reversibili. La maggior parte di questi rischi è gestibile col rigore con cui si gestisce qualsiasi superficie pubblica.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 23 — SUPPORTO -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">23</span><span class="dot"></span>Capitolo VI · Stato del supporto</div>
+      <h2>Cosa <em>funziona</em> già oggi.</h2>
+      <div class="grid-2" style="margin-top:1.5rem">
+        <div>
+          <div class="label-s" style="margin-bottom:1rem">Browser</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div class="surface green">
+              <h3 style="font-family:var(--serif);font-size:22px;margin-bottom:.4rem;font-style:italic;color:var(--green)">Chrome 146</h3>
+              <p style="font-size:13.5px">Early preview · Canary · dietro flag (EPP).</p>
+            </div>
+            <div class="surface">
+              <h3 style="font-family:var(--serif);font-size:22px;margin-bottom:.4rem;font-style:italic">Edge</h3>
+              <p style="font-size:13.5px;color:var(--ink-mute)">In arrivo, basato sullo stesso engine.</p>
+            </div>
+            <div class="surface">
+              <h3 style="font-family:var(--serif);font-size:22px;margin-bottom:.4rem;font-style:italic">Firefox</h3>
+              <p style="font-size:13.5px;color:var(--ink-mute)">Nessun annuncio.</p>
+            </div>
+            <div class="surface">
+              <h3 style="font-family:var(--serif);font-size:22px;margin-bottom:.4rem;font-style:italic">Safari</h3>
+              <p style="font-size:13.5px;color:var(--ink-mute)">Nessun annuncio.</p>
+            </div>
+          </div>
+          <p style="margin-top:1.2rem;font-size:13.5px;color:var(--ink-mute)">Per produzione oggi: <b style="color:var(--green);font-family:var(--serif);font-style:italic;font-size:16px">polyfill</b> con estensione browser che fa da bridge verso client MCP locali (Claude Desktop). <em>Funziona ovunque.</em></p>
+        </div>
+        <div>
+          <div class="label-s" style="margin-bottom:1rem">Ecosistema</div>
+          <ul style="font-size:15px;line-height:1.95">
+            <li>· <b style="color:var(--ink);font-family:var(--serif);font-style:italic;font-size:18px">@mcp-b/global</b> — polyfill universale</li>
+            <li>· <b style="color:var(--ink);font-family:var(--serif);font-style:italic;font-size:18px">@mcp-b/react-webmcp</b> — hook React</li>
+            <li>· <b style="color:var(--ink);font-family:var(--serif);font-style:italic;font-size:18px">@mcp-b/webmcp-ts-sdk</b> — TypeScript SDK</li>
+            <li>· <b style="color:var(--ink);font-family:var(--serif);font-style:italic;font-size:18px">WebMCP Extension</b> — bridge → Claude Desktop</li>
+            <li>· <b style="color:var(--ink);font-family:var(--serif);font-style:italic;font-size:18px">webmachinelearning/webmcp</b> — repo W3C</li>
+            <li>· <b style="color:var(--ink);font-family:var(--serif);font-style:italic;font-size:18px">WebMCP-org/examples</b> — carrello, task manager</li>
+          </ul>
+          <hr class="rule" />
+          <div class="label-s" style="margin-bottom:.7rem;color:var(--hot)">Cosa non c'è ancora</div>
+          <ul style="font-size:14.5px;line-height:1.85;color:var(--ink-soft)">
+            <li>· <span class="text-hot">Headless</span>: serve un browsing context visibile</li>
+            <li>· <span class="text-hot">Discovery preliminare</span>: agente già sulla pagina</li>
+            <li>· <span class="text-hot">Manifest</span> dichiarativo separato dalla pagina</li>
+            <li>· <span class="text-hot">Approccio ibrido</span>: evento DOM "toolcall" interrompibile (in discussione)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 24 — ROADMAP -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">24</span><span class="dot"></span>Capitolo VI · Roadmap di sperimentazione</div>
+      <h2>Come <em>iniziare</em>, senza farsi male.</h2>
+      <ol class="steps" style="margin-top:1rem;max-width:90ch">
+        <li><b>Setup ambiente · 1 giorno</b><span>Leggere proposal W3C + esempi. Installare estensione MCP-B + Claude Desktop. Provare un esempio del repo.</span></li>
+        <li><b>Mini-app pilota · 3–5 giorni</b><span>Una piccola app React con polyfill <code>@mcp-b/global</code>. 3 tool che coprano il flusso più frequente. Validazione: estensione → Claude Desktop, oppure Chrome 146 Canary + flag EPP.</span></li>
+        <li><b>Use case su prodotto cliente · 2–3 settimane</b><span>1 flusso ad alto traffico/dolore. Definizione tool surface (5–10 tool). Implementazione wrapper sul codice esistente. Conferme su azioni sensibili.</span></li>
+        <li><b>Tool surface policy · 1 settimana</b><span>Documento di governance: quali tool, a chi, con quali conferme, come versionarli, come revocarli. Vive col prodotto.</span></li>
+        <li><b>Strumentazione &amp; KPI · continuo</b><span>Audit log delle invocazioni. Misure: tasso d'uso, completamento azione, errori, conferme negate. Confronto con baseline pre-WebMCP.</span></li>
+        <li><b>Pilot in produzione behind flag · 4–8 settimane</b><span>Rilascio a coorte limitata (utenti opt-in, dipendenti, beta). Misurazione. Decisione GA.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============================================================ 25 — NEXT STEPS -->
+  <section class="slide closing">
+    <div class="stagger" style="display:flex;flex-direction:column;width:100%">
+      <div class="kicker"><span class="num">25</span><span class="dot"></span>Conclusioni</div>
+      <h2>Cosa <em>chiediamo</em> dopo questa slide.</h2>
+      <ol class="next-list">
+        <li>Sponsor di un <b>pilot interno</b> da 2–3 settimane: una mini-app, 3 tool, demo end-to-end con Claude.</li>
+        <li>Identificazione di <b>1–2 prodotti cliente candidati</b> dove WebMCP risolverebbe un dolore già misurato.</li>
+        <li>Allocazione di un <b>tech lead</b> per la tool surface policy e la governance.</li>
+        <li>Decisione su <b>positioning Reply</b>: vogliamo essere il system integrator agent-ready di riferimento?</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============================================================ 26 — RISORSE -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">26</span><span class="dot"></span>Risorse</div>
+      <h2>Per <em>approfondire</em>.</h2>
+      <div class="grid-3" style="margin-top:1.5rem">
+        <div>
+          <div class="label-s" style="margin-bottom:1rem;color:var(--green)">Ufficiali W3C / Chrome</div>
+          <ul style="font-size:13.5px;line-height:1.9">
+            <li>· <code>webmachinelearning.github.io/webmcp</code></li>
+            <li>· <code>github.com/webmachinelearning/webmcp</code></li>
+            <li>· <code>developer.chrome.com/blog/webmcp-epp</code></li>
+          </ul>
+          <hr class="rule" />
+          <div class="label-s" style="margin-bottom:1rem;color:var(--green)">SDK &amp; tooling</div>
+          <ul style="font-size:13.5px;line-height:1.9">
+            <li>· <code>github.com/WebMCP-org</code></li>
+            <li>· <code>npmjs.com/@mcp-b/webmcp-ts-sdk</code></li>
+            <li>· <code>docs.mcp-b.ai</code></li>
+            <li>· <code>WebMCP-org/examples</code></li>
+            <li>· <code>WebMCP-org/chrome-devtools-quickstart</code></li>
+          </ul>
+        </div>
+        <div>
+          <div class="label-s" style="margin-bottom:1rem;color:var(--green)">Analisi &amp; opinioni</div>
+          <ul style="font-size:13.5px;line-height:1.9">
+            <li>· VentureBeat — Chrome ships WebMCP</li>
+            <li>· Builder.io — <em>Everyone's missing the point of WebMCP</em></li>
+            <li>· Scalekit — Browser agents without DOM scraping</li>
+            <li>· Webfuse — What is WebMCP &amp; Cheat Sheet 2026</li>
+            <li>· innFactory — W3C standard analysis</li>
+            <li>· Arcade.dev — Intervista Alex Nahas</li>
+            <li>· Semrush — WebMCP per marketer / SEO</li>
+            <li>· Cerovac — Accessibilità &amp; WebMCP</li>
+          </ul>
+        </div>
+        <div>
+          <div class="label-s" style="margin-bottom:1rem;color:var(--hot)">Sicurezza</div>
+          <ul style="font-size:13.5px;line-height:1.9">
+            <li>· <em>Known Security Issues With WebMCP</em> (wiki)</li>
+            <li>· Microsoft — Indirect prompt injection in MCP</li>
+            <li>· MCP Security best practices · modelcontextprotocol.io</li>
+            <li>· Simon Willison — MCP prompt injection problems</li>
+          </ul>
+          <hr class="rule" />
+          <div class="quote-box" style="font-size:14px">
+            <b>Fonte di questo briefing</b>
+            <code>RESEARCH.md</code> — sintesi maggio 2026.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 27 — THANKS -->
+  <section class="slide thanks dark">
+    <div class="stagger" style="width:100%">
+      <div class="kicker" style="color:var(--green-glow)"><span class="num" style="color:rgba(239,230,209,.45);border-right-color:rgba(239,230,209,.2)">27</span><span class="dot" style="background:var(--green-glow);box-shadow:0 0 0 4px rgba(125,232,168,.18)"></span>Fine</div>
+      <h1>Grazie.<br/><em>Domande?</em></h1>
+      <div class="meta">
+        <span><b>Reply</b> · Briefing tecnico WebMCP</span>
+        <span>Maggio 2026</span>
+        <span>Versione 2.0</span>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  const deck = document.getElementById('deck');
+  const slides = [...deck.querySelectorAll('.slide')];
+  const totalEl = document.getElementById('tot');
+  const curEl = document.getElementById('cur');
+  const progress = document.getElementById('progress');
+  const help = document.getElementById('help');
+
+  totalEl.textContent = String(slides.length).padStart(2, '0');
+
+  function readIndex() {
+    const h = location.hash.match(/^#slide-(\d+)$/);
+    if (h) return Math.max(0, Math.min(slides.length - 1, parseInt(h[1], 10) - 1));
+    return 0;
+  }
+
+  let idx = readIndex();
+
+  function render() {
+    slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+    curEl.textContent = String(idx + 1).padStart(2, '0');
+    progress.style.width = ((idx + 1) / slides.length * 100) + '%';
+    // toggle dark chrome based on current slide
+    document.body.classList.toggle('on-dark', slides[idx].classList.contains('dark'));
+    const hash = '#slide-' + (idx + 1);
+    if (location.hash !== hash) history.replaceState(null, '', hash);
+  }
+
+  window.go = (delta) => { idx = Math.max(0, Math.min(slides.length - 1, idx + delta)); render(); };
+  window.toggleHelp = () => help.classList.toggle('show');
+
+  window.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    switch (e.key) {
+      case 'ArrowRight':
+      case ' ':
+      case 'PageDown':
+        e.preventDefault(); go(1); break;
+      case 'ArrowLeft':
+      case 'PageUp':
+        e.preventDefault(); go(-1); break;
+      case 'Home':
+        e.preventDefault(); idx = 0; render(); break;
+      case 'End':
+        e.preventDefault(); idx = slides.length - 1; render(); break;
+      case '?':
+      case 'h':
+      case 'H':
+        toggleHelp(); break;
+      case 'Escape':
+        help.classList.remove('show'); break;
+      case 'f':
+      case 'F':
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+        else document.exitFullscreen();
+        break;
+      case 'p':
+      case 'P':
+        window.print(); break;
+    }
+  });
+
+  window.addEventListener('hashchange', () => { idx = readIndex(); render(); });
+
+  // tap navigation: left quarter back, rest forward
+  deck.addEventListener('click', (e) => {
+    if (e.target.closest('button') || e.target.closest('a')) return;
+    const x = e.clientX / window.innerWidth;
+    if (x < 0.25) go(-1); else go(1);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
