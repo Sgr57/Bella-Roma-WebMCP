@@ -1,4 +1,10 @@
-import { PRODUCTS, getProductById, COUPONS } from "./products";
+import {
+  PRODUCTS,
+  getProductById,
+  COUPONS,
+  type SizeOption,
+  type SweetnessOption,
+} from "./products";
 import { useCartStore } from "../store/cart";
 
 export type ToolResult = {
@@ -24,10 +30,52 @@ function err(text: string): ToolResult {
   return { content: [{ type: "text", text }], isError: true };
 }
 
-function formatProduct(id: string, qty: number): string {
-  const p = getProductById(id);
-  if (!p) return `${id} x${qty}`;
-  return `${p.name} x${qty} (€${(p.price * qty).toFixed(2)})`;
+function formatAlternatives(ids?: string[]): string {
+  if (!ids || ids.length === 0) return "";
+  const labels = ids
+    .map((id) => {
+      const p = getProductById(id);
+      if (!p) return id;
+      const mod = p.price > 0 ? ` (+€${p.price.toFixed(2)})` : "";
+      return `${p.name} (${p.id})${mod}`;
+    })
+    .join(", ");
+  return ` Alternative simili: ${labels}.`;
+}
+
+function formatOptionsLabel(o?: {
+  size?: SizeOption;
+  milk?: string;
+  sweetness?: SweetnessOption;
+}): string {
+  if (!o) return "";
+  const bits: string[] = [];
+  if (o.size) bits.push(`size ${o.size}`);
+  if (o.milk) {
+    const m = getProductById(o.milk);
+    bits.push(`latte: ${m?.name ?? o.milk}`);
+  }
+  if (o.sweetness) bits.push(`zucchero: ${o.sweetness}`);
+  return bits.length ? ` (${bits.join(", ")})` : "";
+}
+
+function formatLine(item: {
+  productId: string;
+  quantity: number;
+  options?: { size?: SizeOption; milk?: string; sweetness?: SweetnessOption };
+}): string {
+  const p = getProductById(item.productId);
+  if (!p) return `${item.productId} x${item.quantity}`;
+  const opts = formatOptionsLabel(item.options);
+  let unit = p.price;
+  if (item.options?.size && p.options?.size?.price_modifier) {
+    unit += p.options.size.price_modifier[item.options.size] ?? 0;
+  }
+  if (item.options?.milk) {
+    const m = getProductById(item.options.milk);
+    if (m) unit += m.price;
+  }
+  return `${p.name} x${item.quantity}${opts} (€${(unit * item.quantity).toFixed(2)})`;
 }
 
 export function buildTools(): Tool[] {
@@ -287,28 +335,99 @@ export function buildTools(): Tool[] {
     },
     {
       name: "add_to_cart",
-      description: "Aggiunge un prodotto al carrello in una certa quantità.",
+      description:
+        "Aggiunge un prodotto al carrello in una certa quantità. Supporta options (size, milk, sweetness) se il prodotto le offre. Se il prodotto o l'opzione richiesta è ESAURITA, ritorna un errore strutturato con alternative coerenti che puoi proporre all'utente.",
       inputSchema: {
         type: "object",
         properties: {
           product_id: { type: "string", description: "L'id del prodotto" },
           quantity: { type: "integer", minimum: 1, maximum: 10 },
+          options: {
+            type: "object",
+            properties: {
+              size: { type: "string", enum: ["S", "M", "L"] },
+              milk: {
+                type: "string",
+                description: "id di un milk_option (es. milk-oat, milk-almond)",
+              },
+              sweetness: { type: "string", enum: ["none", "low", "normal"] },
+            },
+          },
         },
         required: ["product_id", "quantity"],
       },
       async execute(args) {
-        const { product_id, quantity } = args as {
+        const { product_id, quantity, options } = args as {
           product_id: string;
           quantity: number;
+          options?: { size?: SizeOption; milk?: string; sweetness?: SweetnessOption };
         };
-        const okAdd = useCartStore.getState().addItem(product_id, quantity);
-        if (!okAdd) {
+        const product = getProductById(product_id);
+        if (!product) {
           useCartStore
             .getState()
             .logToolCall("add_to_cart", args, "errore: prodotto non trovato");
           return err(`Prodotto "${product_id}" non trovato.`);
         }
-        const msg = `Aggiunto: ${formatProduct(product_id, quantity)}.`;
+        if (!product.available) {
+          const altText = formatAlternatives(product.alternatives);
+          const msg = `Prodotto "${product.name}" ESAURITO.${altText}`;
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: esaurito");
+          return err(msg);
+        }
+        if (options?.size) {
+          if (!product.options?.size?.values.includes(options.size)) {
+            useCartStore
+              .getState()
+              .logToolCall("add_to_cart", args, "errore: size non offerta");
+            return err(
+              `Il prodotto "${product.name}" non offre la dimensione "${options.size}".`,
+            );
+          }
+        }
+        if (options?.sweetness) {
+          if (!product.options?.sweetness?.values.includes(options.sweetness)) {
+            useCartStore
+              .getState()
+              .logToolCall("add_to_cart", args, "errore: sweetness non offerta");
+            return err(
+              `Il prodotto "${product.name}" non offre il livello di zucchero "${options.sweetness}".`,
+            );
+          }
+        }
+        if (options?.milk) {
+          if (!product.options?.milk?.values.includes(options.milk)) {
+            useCartStore
+              .getState()
+              .logToolCall("add_to_cart", args, "errore: milk non offerto");
+            return err(
+              `Il prodotto "${product.name}" non offre l'opzione latte "${options.milk}".`,
+            );
+          }
+          const milkProduct = getProductById(options.milk);
+          if (!milkProduct) {
+            return err(`Opzione latte "${options.milk}" sconosciuta.`);
+          }
+          if (!milkProduct.available) {
+            const altText = formatAlternatives(milkProduct.alternatives);
+            const msg = `Opzione latte "${milkProduct.name}" ESAURITA.${altText}`;
+            useCartStore
+              .getState()
+              .logToolCall("add_to_cart", args, "errore: milk esaurito");
+            return err(msg);
+          }
+        }
+        const okAdd = useCartStore
+          .getState()
+          .addItem(product_id, quantity, options);
+        if (!okAdd) {
+          useCartStore
+            .getState()
+            .logToolCall("add_to_cart", args, "errore generico");
+          return err(`Impossibile aggiungere "${product_id}".`);
+        }
+        const optsLabel = formatOptionsLabel(options);
+        const msg = `Aggiunto: ${product.name} x${quantity}${optsLabel}.`;
         useCartStore.getState().logToolCall("add_to_cart", args, msg);
         return ok(msg);
       },
@@ -371,9 +490,7 @@ export function buildTools(): Tool[] {
           useCartStore.getState().logToolCall("get_cart", {}, "vuoto");
           return ok("Il carrello è vuoto.");
         }
-        const lines = s.items.map(
-          (it) => `- ${formatProduct(it.productId, it.quantity)}`
-        );
+        const lines = s.items.map((it) => `- ${formatLine(it)}`);
         const summary = [
           ...lines,
           `Subtotale: €${s.subtotal().toFixed(2)}`,

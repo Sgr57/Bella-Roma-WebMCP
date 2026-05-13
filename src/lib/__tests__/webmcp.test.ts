@@ -208,7 +208,7 @@ describe("WebMCP tools", () => {
     );
     expect(res.isError).toBeFalsy();
     const t = res.content[0].text;
-    expect(t.toLowerCase()).toContain("esaurito");
+    expect(t.toLowerCase()).toMatch(/esaurit[ao]/);
     expect(t).toContain("milk-oat");
     expect(t).toContain("milk-almond");
   });
@@ -227,5 +227,65 @@ describe("WebMCP tools", () => {
       fakeAgent,
     );
     expect(res.isError).toBe(true);
+  });
+
+  it("add_to_cart accepts options and stores them on the line", async () => {
+    const res = await findTool("add_to_cart").execute(
+      {
+        product_id: "cappuccino",
+        quantity: 1,
+        options: { size: "L", milk: "milk-oat", sweetness: "none" },
+      },
+      fakeAgent,
+    );
+    expect(res.isError).toBeFalsy();
+    const items = useCartStore.getState().items;
+    expect(items).toHaveLength(1);
+    expect(items[0].options).toEqual({
+      size: "L",
+      milk: "milk-oat",
+      sweetness: "none",
+    });
+  });
+
+  it("add_to_cart errors with alternatives when milk option is OOS", async () => {
+    const res = await findTool("add_to_cart").execute(
+      {
+        product_id: "cappuccino",
+        quantity: 1,
+        options: { milk: "milk-soy" },
+      },
+      fakeAgent,
+    );
+    expect(res.isError).toBe(true);
+    const t = res.content[0].text;
+    expect(t.toLowerCase()).toMatch(/esaurit[ao]/);
+    expect(t).toContain("milk-oat");
+    expect(t).toContain("milk-almond");
+    expect(useCartStore.getState().items).toHaveLength(0);
+  });
+
+  it("add_to_cart errors when option is not offered by the product", async () => {
+    const res = await findTool("add_to_cart").execute(
+      {
+        product_id: "espresso",
+        quantity: 1,
+        options: { milk: "milk-oat" },
+      },
+      fakeAgent,
+    );
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text.toLowerCase()).toContain("non offre");
+  });
+
+  it("add_to_cart errors when product itself is unavailable", async () => {
+    const res = await findTool("add_to_cart").execute(
+      { product_id: "milk-soy", quantity: 1 },
+      fakeAgent,
+    );
+    expect(res.isError).toBe(true);
+    const t = res.content[0].text;
+    expect(t.toLowerCase()).toMatch(/esaurit[ao]/);
+    expect(t).toContain("milk-oat");
   });
 });
