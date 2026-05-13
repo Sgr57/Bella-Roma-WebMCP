@@ -7,6 +7,7 @@ import { Cart } from "./components/Cart";
 import { ToolActivityLog } from "./components/ToolActivityLog";
 import { CheckoutModal } from "./components/CheckoutModal";
 import { Footer } from "./components/Footer";
+import { TryWithAgent } from "./components/TryWithAgent";
 import { ensureWebMCP, type WebMCPMode } from "./lib/polyfill";
 import { registerTools } from "./lib/webmcp";
 import {
@@ -58,6 +59,7 @@ export default function App() {
       />
       <Hero />
       <DemoBanner />
+      <TryWithAgent />
       <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 p-4">
         <ProductGrid />
         <Cart />
