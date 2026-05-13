@@ -35,50 +35,153 @@ export function buildTools(): Tool[] {
     {
       name: "search_products",
       description:
-        "Cerca prodotti nel catalogo del coffee shop. Permette di filtrare per categoria, prezzo massimo o testo libero.",
+        "Cerca prodotti nel catalogo (drink, food, beans, capsule). I prodotti di tipo milk_option sono esclusi di default — passa type:'milk_option' per includerli. Tutti i filtri sono in AND; tags/dietary/flavor_notes sono AND interno (il prodotto deve avere tutti i valori richiesti).",
       inputSchema: {
         type: "object",
         properties: {
           query: {
             type: "string",
-            description: "Testo libero da cercare nel nome o descrizione",
+            description: "Testo libero da cercare nel nome o nella descrizione",
           },
           category: {
             type: "string",
-            enum: ["espresso", "filtro", "decaf", "latte"],
-            description: "Categoria del prodotto",
+            enum: [
+              "espresso",
+              "filtro",
+              "decaf",
+              "latte",
+              "cold",
+              "food",
+              "beans",
+              "capsule",
+            ],
+          },
+          type: {
+            type: "string",
+            enum: ["drink", "food", "beans", "capsule", "milk_option"],
           },
           max_price: { type: "number", description: "Prezzo massimo in euro" },
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            description: "Tag richiesti (AND). Es: ['signature', 'best-seller']",
+          },
+          dietary: {
+            type: "array",
+            items: {
+              type: "string",
+              enum: ["vegan", "lactose-free", "gluten-free", "no-caffeine"],
+            },
+            description: "Requisiti dietetici richiesti (AND)",
+          },
+          flavor_notes: {
+            type: "array",
+            items: {
+              type: "string",
+              enum: [
+                "floral",
+                "fruity",
+                "chocolate",
+                "caramel",
+                "nutty",
+                "citrus",
+                "spicy",
+                "honey",
+                "berry",
+              ],
+            },
+            description: "Note aromatiche richieste (AND)",
+          },
+          origin: {
+            type: "string",
+            description: "Es: 'Etiopia', 'Colombia', 'Italia'",
+          },
+          intensity_min: { type: "number", minimum: 1, maximum: 10 },
+          intensity_max: { type: "number", minimum: 1, maximum: 10 },
+          time_of_day: {
+            type: "string",
+            enum: ["morning", "afternoon", "evening", "anytime"],
+          },
+          in_stock_only: {
+            type: "boolean",
+            description: "Se true, esclude i prodotti non disponibili",
+          },
         },
       },
       async execute(args) {
-        const { query, category, max_price } = args as {
+        const a = args as {
           query?: string;
           category?: string;
+          type?: string;
           max_price?: number;
+          tags?: string[];
+          dietary?: string[];
+          flavor_notes?: string[];
+          origin?: string;
+          intensity_min?: number;
+          intensity_max?: number;
+          time_of_day?: string;
+          in_stock_only?: boolean;
         };
-        const q = (query ?? "").toLowerCase().trim();
+        const q = (a.query ?? "").toLowerCase().trim();
         const results = PRODUCTS.filter((p) => {
-          if (category && p.category !== category) return false;
-          if (typeof max_price === "number" && p.price > max_price) return false;
+          if (p.type === "milk_option" && a.type !== "milk_option") return false;
+          if (a.type && p.type !== a.type) return false;
+          if (a.category && p.category !== a.category) return false;
+          if (typeof a.max_price === "number" && p.price > a.max_price)
+            return false;
+          if (a.origin && p.origin !== a.origin) return false;
+          if (
+            typeof a.intensity_min === "number" &&
+            (p.intensity ?? 0) < a.intensity_min
+          )
+            return false;
+          if (
+            typeof a.intensity_max === "number" &&
+            (p.intensity ?? 10) > a.intensity_max
+          )
+            return false;
+          if (a.in_stock_only && !p.available) return false;
+          if (a.tags && a.tags.length > 0) {
+            const has = new Set(p.tags ?? []);
+            if (!a.tags.every((t) => has.has(t))) return false;
+          }
+          if (a.dietary && a.dietary.length > 0) {
+            const has = new Set(p.dietary ?? []);
+            if (!a.dietary.every((d) => has.has(d))) return false;
+          }
+          if (a.flavor_notes && a.flavor_notes.length > 0) {
+            const has = new Set(p.flavor_notes ?? []);
+            if (!a.flavor_notes.every((f) => has.has(f))) return false;
+          }
+          if (a.time_of_day) {
+            const has = new Set(p.time_of_day ?? []);
+            if (!has.has(a.time_of_day) && !has.has("anytime")) return false;
+          }
           if (q && !`${p.name} ${p.description}`.toLowerCase().includes(q))
             return false;
           return true;
         });
-        const result = results.length
+        const text = results.length
           ? results
-              .map(
-                (p) =>
-                  `- ${p.name} (id: ${p.id}, ${p.category}) — €${p.price.toFixed(
-                    2
-                  )} — ${p.description}`
-              )
+              .map((p) => {
+                const bits = [
+                  `${p.name} (id: ${p.id}, ${p.category})`,
+                  typeof p.intensity === "number"
+                    ? `intensità ${p.intensity}/10`
+                    : null,
+                  p.origin ? p.origin : null,
+                  `€${p.price.toFixed(2)}`,
+                  p.available ? null : "ESAURITO",
+                ].filter(Boolean);
+                return `- ${bits.join(" — ")} — ${p.description}`;
+              })
               .join("\n")
           : "Nessun prodotto trovato.";
         useCartStore
           .getState()
           .logToolCall("search_products", args, `${results.length} risultati`);
-        return ok(result);
+        return ok(text);
       },
     },
     {

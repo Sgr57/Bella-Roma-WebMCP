@@ -18,8 +18,8 @@ describe("WebMCP tools", () => {
     fakeAgent.requestUserInteraction.mockClear();
   });
 
-  it("exposes exactly 6 tools", () => {
-    expect(buildTools()).toHaveLength(6);
+  it("exposes exactly 7 tools", () => {
+    expect(buildTools()).toHaveLength(7);
   });
 
   it("search_products returns all products when no filter", async () => {
@@ -125,5 +125,66 @@ describe("WebMCP tools", () => {
   it("checkout errors on empty cart", async () => {
     const res = await findTool("checkout").execute({}, fakeAgent);
     expect(res.isError).toBe(true);
+  });
+
+  it("search_products excludes milk_option by default", async () => {
+    const res = await findTool("search_products").execute({}, fakeAgent);
+    expect(res.content[0].text).not.toContain("milk-whole");
+    expect(res.content[0].text).not.toContain("Latte intero");
+  });
+
+  it("search_products filters by type=beans", async () => {
+    const res = await findTool("search_products").execute(
+      { type: "beans" },
+      fakeAgent,
+    );
+    expect(res.content[0].text).toContain("Chicchi Etiopia");
+    expect(res.content[0].text).not.toContain("Cappuccino");
+  });
+
+  it("search_products filters by dietary contains all", async () => {
+    const res = await findTool("search_products").execute(
+      { dietary: ["no-caffeine"] },
+      fakeAgent,
+    );
+    expect(res.content[0].text).toContain("Decaffeinato");
+    expect(res.content[0].text).not.toContain("Espresso Classico");
+  });
+
+  it("search_products filters by flavor_notes contains all", async () => {
+    const res = await findTool("search_products").execute(
+      { flavor_notes: ["fruity"] },
+      fakeAgent,
+    );
+    expect(res.content[0].text).toContain("Filtro Etiopia");
+    expect(res.content[0].text).not.toContain("Espresso Classico");
+  });
+
+  it("search_products filters by intensity_max", async () => {
+    const res = await findTool("search_products").execute(
+      { intensity_max: 4 },
+      fakeAgent,
+    );
+    expect(res.content[0].text).toContain("Decaffeinato");
+    expect(res.content[0].text).not.toContain("Doppio Espresso");
+  });
+
+  it("search_products filters by origin", async () => {
+    const res = await findTool("search_products").execute(
+      { origin: "Etiopia" },
+      fakeAgent,
+    );
+    expect(res.content[0].text).toContain("Filtro Etiopia");
+    expect(res.content[0].text).toContain("Chicchi Etiopia");
+    expect(res.content[0].text).not.toContain("Cappuccino");
+  });
+
+  it("search_products in_stock_only=true hides unavailable", async () => {
+    const res = await findTool("search_products").execute(
+      { type: "milk_option", in_stock_only: true },
+      fakeAgent,
+    );
+    expect(res.content[0].text).not.toContain("Latte di soia");
+    expect(res.content[0].text).toContain("Latte d'avena");
   });
 });
