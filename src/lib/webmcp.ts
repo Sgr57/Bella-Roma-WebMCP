@@ -1,20 +1,20 @@
 import { PRODUCTS, getProductById, COUPONS } from "./products";
 import { useCartStore } from "../store/cart";
 
-type ToolResult = {
+export type ToolResult = {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 };
 
-type Agent = {
-  requestUserInteraction: <T>(fn: () => Promise<T> | T) => Promise<T>;
+export type Agent = {
+  requestUserInteraction?: <T>(fn: () => Promise<T> | T) => Promise<T>;
 };
 
-type Tool = {
+export type Tool = {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  execute: (args: Record<string, unknown>, agent: Agent) => Promise<ToolResult>;
+  execute: (args: Record<string, unknown>, agent?: Agent) => Promise<ToolResult>;
 };
 
 function ok(text: string): ToolResult {
@@ -197,9 +197,10 @@ export function buildTools(): Tool[] {
         }
         const total = s.total();
         const { requestCheckoutConfirmation } = await import("./checkout-bridge");
-        const confirmed = await agent.requestUserInteraction(async () => {
-          return requestCheckoutConfirmation(total);
-        });
+        const ask = () => requestCheckoutConfirmation(total);
+        const confirmed = agent?.requestUserInteraction
+          ? await agent.requestUserInteraction(ask)
+          : await ask();
         if (!confirmed) {
           useCartStore
             .getState()
@@ -215,16 +216,58 @@ export function buildTools(): Tool[] {
   ];
 }
 
-export function registerTools(): void {
-  if (!navigator.modelContext) {
+let registered = false;
+
+async function listExistingToolNames(getTools?: () => unknown): Promise<Set<string>> {
+  if (!getTools) return new Set();
+  try {
+    const raw = await Promise.resolve(getTools());
+    const arr = Array.isArray(raw) ? raw : [];
+    return new Set(arr.map((t) => (t as { name: string }).name));
+  } catch {
+    return new Set();
+  }
+}
+
+export async function registerTools(): Promise<void> {
+  if (registered) return;
+  const mc = navigator.modelContext as
+    | undefined
+    | {
+        registerTool?: (tool: unknown) => unknown;
+        provideContext?: (cfg: { tools: unknown[] }) => void;
+        getTools?: () => unknown;
+      };
+  if (!mc) {
     console.warn(
       "[webmcp] navigator.modelContext not available, skipping registration"
     );
     return;
   }
-  // @mcp-b/global ambient types declare stricter ToolDescriptor/InputSchema
-  // signatures than the WebMCP draft spec. Our local Tool shape matches the
-  // spec and works at runtime; cast bridges the mismatch at the boundary.
-  (navigator.modelContext as { provideContext: (cfg: { tools: unknown[] }) => void })
-    .provideContext({ tools: buildTools() });
+  const tools = buildTools();
+  // Native Chrome Canary API: registerTool per tool (può essere async).
+  // Polyfill @mcp-b/global API: provideContext({tools}).
+  if (typeof mc.registerTool === "function") {
+    const existing = await listExistingToolNames(mc.getTools);
+    let count = 0;
+    for (const t of tools) {
+      if (existing.has(t.name)) continue;
+      try {
+        await Promise.resolve(mc.registerTool(t));
+        count++;
+      } catch (err) {
+        console.warn(`[webmcp] registerTool('${t.name}') failed:`, err);
+      }
+    }
+    registered = true;
+    console.info(`[webmcp] registered ${count}/${tools.length} tools via native registerTool`);
+    return;
+  }
+  if (typeof mc.provideContext === "function") {
+    mc.provideContext({ tools });
+    registered = true;
+    console.info(`[webmcp] registered ${tools.length} tools via provideContext`);
+    return;
+  }
+  console.warn("[webmcp] modelContext present but no known registration API");
 }

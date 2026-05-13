@@ -13,25 +13,19 @@ Apri http://localhost:5173
 
 ## Demo: collegare un agente AI
 
-Hai due strade. Per la demo dal vivo l'**opzione B** è la più affidabile.
+Due strade, **entrambe affidabili**, entrambe selezionabili dallo **stesso toggle in header** o dal query param `?relay=true`. La pagina rileva il browser e instrada da sola al bridge giusto.
 
-### Opzione A — Chrome Canary 146+ (WebMCP nativo)
+| Browser | Bridge selezionato | Estensione? | Polyfill? |
+|---|---|---|---|
+| Chrome Canary 146+ (EPP) | `relay-client.ts` in-page (nostro) | no | no — usa `navigator.modelContext` nativo |
+| Chrome stable / qualunque | embed `@mcp-b/webmcp-local-relay` da CDN | no | sì (`@mcp-b/global`) |
+| Toggle off | (nessuno) | — | — |
 
-1. Installa **Chrome Canary 146** o superiore.
-2. Iscriviti all'**EPP (Early Preview Program)** WebMCP: https://developer.chrome.com/docs/ai/join-epp
-3. Segui le istruzioni che ti arrivano via email (il flag specifico non è documentato pubblicamente, è gated dietro l'EPP).
-4. Apri la demo: l'header mostra 🟢 *WebMCP nativo attivo*.
-5. Usa l'assistente AI integrato di Chrome (o un'estensione compatibile).
+In tutti i casi il consumer è **Claude Desktop** (o qualunque client MCP stdio) tramite lo stesso relay locale `webmcp-local-relay` che gira su `127.0.0.1:9333`.
 
-> Realisticamente la signup EPP può richiedere giorni. Per una demo imminente usa l'opzione B.
+### Configurazione comune — Claude Desktop
 
-### Opzione B — Claude Desktop + webmcp-local-relay (consigliato)
-
-Niente estensioni Chrome richieste. Il bridge è un piccolo MCP server locale che Claude Desktop avvia tramite `npx` e che riceve via WebSocket i tool dalla tab del browser.
-
-**1. Configura Claude Desktop**
-
-Apri (o crea) `~/Library/Application Support/Claude/claude_desktop_config.json` su macOS (o l'equivalente per Windows / Linux) e aggiungi sotto `mcpServers`:
+Apri (o crea) `~/Library/Application Support/Claude/claude_desktop_config.json` su macOS (o l'equivalente Windows/Linux) e aggiungi sotto `mcpServers`:
 
 ```json
 {
@@ -44,45 +38,65 @@ Apri (o crea) `~/Library/Application Support/Claude/claude_desktop_config.json` 
 }
 ```
 
-**2. Riavvia completamente Claude Desktop** (⌘Q + riapri — non basta chiudere la finestra).
+Riavvia completamente Claude Desktop (⌘Q + riapri — non basta chiudere la finestra). Verifica che il relay sia in ascolto:
 
-**3. Apri o ricarica** la demo su http://localhost:5173. L'header mostra 🟡 *Polyfill MCP-B attivo*. La tab si collega automaticamente al relay tramite WebSocket su `ws://127.0.0.1:9333` (vedi sezione "Come funziona il bridge" sotto).
+```bash
+lsof -nP -i :9333
+# devi vedere: node ... TCP 127.0.0.1:9333 (LISTEN)
+```
 
-**4. In Claude Desktop chiedi**: *"List the connected WebMCP sources"*. Deve elencare la tab "Bella Roma Coffee" con i 6 tool.
+### Apri la demo
 
-**5. Lancia il flusso demo** con uno dei prompt del banner:
+```
+http://localhost:5173/?relay=true
+```
+
+(oppure carica `http://localhost:5173/` e clicca **Relay: off** in header per attivarlo — fa lo stesso, ricaricando.)
+
+L'header mostra due indicatori:
+
+- **Connessione WebMCP** — 🟢 *nativo (Canary)* / 🟡 *Polyfill MCP-B (compat)* / ⚪ *nessun agente collegato*.
+- **Bridge** — 🔵 *native WS (open)* / 🟣 *embed CDN* / 🟠 *connecting* / 🔴 *closed-error* / ▫ *off*.
+
+Su Canary EPP dovresti vedere 🟢 + 🔵 *open*. Su Chrome stable: 🟡 + 🟣.
+
+### Verifica end-to-end
+
+In Claude Desktop chiedi:
+
+> *"List the connected WebMCP sources"*
+
+Deve elencare la tab **"Bella Roma Coffee"** con i 6 tool. Poi prova uno dei prompt del banner:
+
 - *"Ordina 2 espresso e 1 cappuccino, applica BENVENUTO e fai checkout"*
 - *"Mostrami solo i caffè sotto i 2 euro"*
 - *"Svuota il carrello e ricomincia"*
 
-L'agente invoca i tool, vedrai i prodotti volare nel carrello, il coupon applicarsi, e al `checkout` apparirà un modale di conferma — è il momento clou: l'AI non agisce alle tue spalle.
+L'agente invoca i tool, vedrai i prodotti volare nel carrello, il coupon applicarsi, e al `checkout` apparirà un modale di conferma — momento clou: l'AI non agisce alle tue spalle.
 
-### Come funziona il bridge (Opzione B)
+### Come funzionano i due bridge
 
 ```
-┌────────────────┐    stdio MCP    ┌──────────────────────┐
-│ Claude Desktop │ ◀─────────────▶ │ webmcp-local-relay   │
-└────────────────┘                 │ (avviato da Claude)  │
-                                   └──────────┬───────────┘
-                                              │  ws://127.0.0.1:9333
-                                              ▼
-                                   ┌──────────────────────┐
-                                   │ Bella Roma tab       │
-                                   │ (polyfill + embed)   │
-                                   └──────────────────────┘
+                  ┌────────────────┐    stdio MCP    ┌──────────────────────┐
+                  │ Claude Desktop │ ◀─────────────▶ │ webmcp-local-relay   │
+                  └────────────────┘                 │  (avviato da Claude) │
+                                                     └──────────┬───────────┘
+                                                                │ ws://127.0.0.1:9333
+                                  ┌─────────────────────────────┼─────────────────────────────┐
+                                  ▼                                                           ▼
+                ┌────────────────────────────────┐                          ┌──────────────────────────────┐
+                │ Canary (native)                │                          │ Chrome stable (polyfill)     │
+                │ navigator.modelContext         │                          │ @mcp-b/global polyfill       │
+                │   registerTool ×6 (W3C spec)   │                          │   provideContext({tools})    │
+                │                                │                          │                              │
+                │ src/lib/relay-client.ts        │                          │ embed.js (CDN jsDelivr)      │
+                │   apre WS → 9333               │                          │   inietta iframe hidden      │
+                │   hello / tools/list / invoke  │                          │   iframe apre WS → 9333      │
+                │   dispatch in-page             │                          │                              │
+                └────────────────────────────────┘                          └──────────────────────────────┘
 ```
 
-La pagina usa **due pezzi** lato browser, entrambi già configurati nel progetto:
-
-1. **`@mcp-b/global`** (npm dep): polyfilla `navigator.modelContext` in-page così l'app può chiamare `provideContext({tools})` e registrare i 6 tool.
-2. **Embed script** in `index.html` (caricato da CDN jsDelivr): apre il WebSocket *client* verso il relay locale, inoltra l'elenco dei tool e gestisce le chiamate.
-
-```html
-<!-- in index.html -->
-<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
-```
-
-Senza l'embed, il polyfill funziona ma i tool restano "intrappolati" nella pagina e Claude Desktop non li vede. Per usare la pagina **offline / senza relay**, basta togliere lo script — la UI manuale resta utilizzabile.
+Tutto il routing tra i due bridge è in `src/lib/relay.ts` → `connectRelay(mode)`. La detection del mode (`native` vs `polyfill` vs `unavailable`) è in `src/lib/polyfill.ts`: distingue native vs polyfill confrontando `constructor.name === "ModelContext"` e l'assenza di `provideContext`, perché il solo `'modelContext' in navigator` non basta — alcuni setup caricano il polyfill come side-effect anche su browser nativi.
 
 ## Tool esposti
 
@@ -107,10 +121,13 @@ Test su `store/cart`, `lib/products`, `lib/webmcp` (catalogo, store, tool adapte
 ## Architettura
 
 - **Zustand** (`src/store/cart.ts`) è la *single source of truth* per carrello, coupon applicato e log delle invocazioni dei tool.
-- **`src/lib/webmcp.ts`** è l'**adapter** tra l'API WebMCP e lo store. Espone `buildTools()` (6 tool) e `registerTools()` che chiama `navigator.modelContext.provideContext({tools})`.
-- **`src/lib/polyfill.ts`** carica `@mcp-b/global` se `navigator.modelContext` non è disponibile nativamente, e ritorna lo stato (`native` / `polyfill` / `unavailable`) all'header per l'indicatore di connessione.
-- **Embed script** in `index.html` (CDN jsDelivr): apre il WebSocket verso il relay locale ed espone i tool registrati su `navigator.modelContext` a Claude Desktop. Necessario per il path Claude Desktop; può essere rimosso se la pagina è usata stand-alone.
-- **`src/lib/checkout-bridge.ts`** è un piccolo event-bridge: il tool `checkout` invoca `requestCheckoutConfirmation(total)` dentro `agent.requestUserInteraction(...)`; un componente React (`CheckoutModal`) si registra come listener e mostra il modale stilato.
+- **`src/lib/webmcp.ts`** è l'**adapter** tra l'API WebMCP e lo store. Espone `buildTools()` (6 tool) e `registerTools()` che è ora **dual-API**: usa `navigator.modelContext.registerTool(t)` (W3C spec, nativo) oppure `provideContext({tools})` (polyfill `@mcp-b/global`) a seconda di chi è presente. Idempotente (guard `registered` + dedup via `getTools()` quando disponibile).
+- **`src/lib/polyfill.ts`** rileva la modalità (`native` / `polyfill` / `unavailable`) e carica `@mcp-b/global` solo se serve. Distingue native vs polyfill anche quando entrambi appaiono presenti, leggendo `constructor.name` e l'assenza di `provideContext`.
+- **`src/lib/relay.ts`** (orchestratore) — legge il flag `?relay=true`, chiama `connectRelay(mode)` che instrada al bridge giusto:
+  - `mode === "native"` → import dinamico di `relay-client.ts` (vedi sotto).
+  - `mode === "polyfill"` → inietta lo `<script>` dell'embed CDN (`@mcp-b/webmcp-local-relay/dist/browser/embed.js`).
+- **`src/lib/relay-client.ts`** (~165 LoC) — implementa il protocollo del relay direttamente: `WebSocket` verso `127.0.0.1:9333`, handshake `hello` + `tools/list`, gestione `invoke/result`, `ping/pong`, reconnect con backoff (2s → 30s). Nessuna dipendenza da `executeTool` non-spec di Chrome: dispatcha localmente chiamando `tool.execute(args, fakeClient)`. Espone `onRelayState(...)` per l'indicatore in Header.
+- **`src/lib/checkout-bridge.ts`** è un piccolo event-bridge: il tool `checkout` invoca `requestCheckoutConfirmation(total)` dentro `agent.requestUserInteraction(...)` se l'agent è disponibile, altrimenti chiama il bridge diretto (il modale React si apre lo stesso).
 - I componenti React (`Header`, `DemoBanner`, `ProductGrid`, `ProductCard`, `Cart`, `ToolActivityLog`, `CheckoutModal`) leggono dallo store: la UI manuale (click) e quella agentica (tool) passano dagli stessi update — *esattamente il vantaggio chiave di WebMCP*.
 
 Design completo in [`docs/superpowers/specs/2026-05-12-bella-roma-coffee-demo-design.md`](docs/superpowers/specs/2026-05-12-bella-roma-coffee-demo-design.md).
@@ -118,7 +135,7 @@ Piano di implementazione in [`docs/superpowers/plans/2026-05-12-bella-roma-coffe
 
 ## Stack
 
-Vite 6 · React 18 · TypeScript 5 · Tailwind CSS 3 · Zustand · Framer Motion · `@mcp-b/global` polyfill · Vitest + Testing Library
+Vite 6 · React 18 · TypeScript 5 · Tailwind CSS 3 · Zustand · Framer Motion · `@mcp-b/global` polyfill (solo path compat) · Vitest + Testing Library
 
 ## Note per la demo dal vivo
 
@@ -131,13 +148,20 @@ Vite 6 · React 18 · TypeScript 5 · Tailwind CSS 3 · Zustand · Framer Motion
 ## Troubleshooting
 
 **"There are no connected WebMCP sources" in Claude Desktop**
+- Verifica che il toggle relay sia su **on** (header: 🔵 o 🟣) — `?relay=true` nell'URL.
 - Riavvia Claude Desktop completamente dopo aver modificato `claude_desktop_config.json` (⌘Q, non basta chiudere la finestra).
-- Ricarica la tab della demo **dopo** che Claude Desktop è ripartito (la connessione WebSocket viene aperta al `load` della pagina).
-- Verifica che il relay sia in ascolto: `lsof -nP -i :9333`. Devi vedere `node ... LISTEN` e poi `Google ... ESTABLISHED` quando apri la pagina.
-- Verifica che l'embed script si carichi: in DevTools → Network filtra per `embed.js`, dovrebbe essere `200 OK`.
+- Verifica che il relay sia in ascolto: `lsof -nP -i :9333`. Devi vedere `node ... LISTEN` e una riga `Google ... ESTABLISHED` per ogni tab connessa.
+- Ricarica la tab **dopo** che Claude Desktop è ripartito (la connessione WebSocket viene aperta al `load`).
 
-**L'indicatore in alto a destra resta ⚪ "Nessun agente collegato"**
-- L'indicatore guarda solo `navigator.modelContext`, non lo stato della connessione al relay. Se vedi 🟡 e Claude Desktop comunque non vede la tab, il problema è la connessione WebSocket all'embed, non il polyfill.
+**Path nativo (Canary): l'indicatore relay resta 🔴 closed/error**
+- Significa che `relay-client.ts` non riesce a connettersi a `ws://127.0.0.1:9333`. Causa più comune: Claude Desktop non in esecuzione o config `mcpServers` non applicata. Backoff esponenziale fino a 30s tra tentativi.
+- Cross-check con `lsof -nP -i :9333`: se vedi solo `LISTEN` senza `ESTABLISHED` dopo qualche secondo dal load, la connessione non è andata a buon fine.
+
+**Path compat (Chrome stable): nessun iframe iniettato dall'embed**
+- L'embed CDN usa il selettore `[data-webmcp-relay]` per la propria idempotenza: assicurati di non averlo applicato altrove a mano. Il nostro loader usa `data-webmcp-embed-loader` apposta per evitare la collisione.
+
+**L'indicatore connessione resta ⚪ "Nessun agente collegato"**
+- Significa che né la nativa né il polyfill sono caricati. Verifica che `npm install` sia andato a buon fine (il polyfill `@mcp-b/global` è una dipendenza npm; senza, su Chrome stable il fallback non parte).
 
 **Il modale di checkout non appare quando l'agente chiama `checkout`**
 - Verifica che `CheckoutModal` sia mounted (è in `App.tsx`). Senza modale registrato, `requestCheckoutConfirmation` fa fallback a `window.confirm`.
