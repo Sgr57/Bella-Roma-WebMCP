@@ -24,19 +24,21 @@ export function Cart() {
         flash > 0
           ? {
               boxShadow: [
-                "0 0 0 rgba(200,152,96,0)",
-                "0 0 30px rgba(200,152,96,0.6)",
-                "0 0 0 rgba(200,152,96,0)",
+                "0 0 0 rgba(255,135,0,0)",
+                "0 0 30px rgba(255,135,0,0.55)",
+                "0 0 0 rgba(255,135,0,0)",
               ],
             }
           : {}
       }
       transition={{ duration: 0.8 }}
-      className="bg-white rounded-lg shadow-sm border border-coffee-cream p-4 sticky top-4"
+      className="bg-white rounded-2xl shadow-lavazza border border-lavazza-line p-5 sticky top-4"
     >
-      <h2 className="font-display text-xl text-coffee-dark mb-2">Carrello</h2>
+      <h2 className="font-display text-xl font-bold text-lavazza-deep mb-3">
+        Carrello
+      </h2>
       {items.length === 0 ? (
-        <p className="text-sm text-coffee-mid italic">Il carrello è vuoto.</p>
+        <p className="text-sm text-coffee-mid">Il carrello è vuoto.</p>
       ) : (
         <>
           <ul className="mb-3">
@@ -57,9 +59,9 @@ export function Cart() {
           </ul>
           <motion.div
             layout
-            className="text-sm space-y-1 border-t border-coffee-cream pt-2"
+            className="text-sm space-y-1 border-t border-lavazza-line pt-3"
           >
-            <div className="flex justify-between">
+            <div className="flex justify-between text-coffee-mid">
               <span>Subtotale</span>
               <span>€{subtotal.toFixed(2)}</span>
             </div>
@@ -70,7 +72,7 @@ export function Cart() {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="flex justify-between text-green-700"
+                  className="flex justify-between text-coffee-accent font-medium"
                 >
                   <span>
                     Coupon {coupon}{" "}
@@ -85,12 +87,12 @@ export function Cart() {
                 </motion.div>
               )}
             </AnimatePresence>
-            <div className="flex justify-between font-bold text-base pt-1 border-t border-coffee-cream">
+            <div className="flex justify-between font-bold text-base pt-2 border-t border-lavazza-line text-lavazza-deep">
               <span>Totale</span>
               <motion.span
                 key={total.toFixed(2)}
-                initial={{ scale: 1.2, color: "#c89860" }}
-                animate={{ scale: 1, color: "#3b2417" }}
+                initial={{ scale: 1.2, color: "#FF8700" }}
+                animate={{ scale: 1, color: "#051432" }}
                 transition={{ duration: 0.3 }}
               >
                 €{total.toFixed(2)}
@@ -106,9 +108,9 @@ export function Cart() {
                 useCartStore.getState().checkout();
               }
             }}
-            className="w-full mt-3 bg-coffee-dark text-coffee-cream py-2 rounded font-medium hover:bg-coffee-mid"
+            className="w-full mt-4 bg-coffee-dark text-white py-3 rounded-pill text-xs uppercase tracking-[0.1em] font-semibold border-[1.5px] border-coffee-dark hover:bg-lavazza-deep hover:border-lavazza-deep transition"
           >
-            Checkout
+            Procedi al checkout
           </button>
         </>
       )}

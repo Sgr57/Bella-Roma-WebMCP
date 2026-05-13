@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Header } from "./components/Header";
 import { DemoBanner } from "./components/DemoBanner";
+import { Hero } from "./components/Hero";
 import { ProductGrid } from "./components/ProductGrid";
 import { Cart } from "./components/Cart";
 import { ToolActivityLog } from "./components/ToolActivityLog";
 import { CheckoutModal } from "./components/CheckoutModal";
+import { Footer } from "./components/Footer";
 import { ensureWebMCP, type WebMCPMode } from "./lib/polyfill";
 import { registerTools } from "./lib/webmcp";
 import {
@@ -54,11 +56,13 @@ export default function App() {
         relayVariant={relayVariant}
         relayState={relayState}
       />
+      <Hero />
       <DemoBanner />
-      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 p-4">
+      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 p-4">
         <ProductGrid />
         <Cart />
       </main>
+      <Footer />
       <ToolActivityLog />
       <CheckoutModal />
     </div>

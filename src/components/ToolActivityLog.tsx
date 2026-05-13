@@ -11,12 +11,12 @@ export function ToolActivityLog() {
   const recent = activity.slice(-10).reverse();
 
   return (
-    <div className="fixed bottom-4 right-4 w-80 max-h-96 bg-coffee-dark text-coffee-cream rounded-lg shadow-2xl overflow-hidden flex flex-col border border-coffee-accent z-40">
-      <div className="px-3 py-2 bg-black/30 flex items-center justify-between">
-        <span className="text-xs font-mono uppercase tracking-wide">
+    <div className="fixed bottom-4 left-4 w-80 max-h-96 bg-coffee-dark text-white rounded-2xl shadow-lavazza-md overflow-hidden flex flex-col border border-coffee-accent z-40">
+      <div className="px-4 py-2.5 bg-black/30 flex items-center justify-between border-b border-white/10">
+        <span className="text-[11px] uppercase tracking-[0.15em] font-medium">
           Tool Activity ({activity.length})
         </span>
-        <span className="text-xs opacity-60">live</span>
+        <span className="text-[10px] uppercase tracking-wider opacity-70">live</span>
       </div>
       <ul className="overflow-y-auto flex-1 px-2 py-1 text-xs font-mono space-y-1">
         {recent.length === 0 && (
