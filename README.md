@@ -1,6 +1,19 @@
 # Bella Roma Coffee — Demo WebMCP
 
-Single-page React app che simula la torrefazione fittizia **Bella Roma Coffee** ed espone le sue azioni come 6 tool WebMCP invocabili da un agente AI direttamente nel browser tramite `navigator.modelContext`. Costruita per una demo da 60 secondi davanti a manager.
+> **Proof-of-Concept**: una vetrina e‑commerce *agent-ready*. Un agente AI (Claude Desktop) ordina caffè, applica coupon e fa checkout su una pagina React **senza** vedere il DOM, senza scraper, senza pilotare il cursore — chiama direttamente i tool che la pagina espone.
+
+Single-page React app che simula la torrefazione fittizia **Bella Roma Coffee** ed espone le sue azioni come **6 tool WebMCP** invocabili da un agente AI nel browser tramite `navigator.modelContext`. Pensata per una demo da 60 secondi davanti a stakeholder non tecnici, ma costruita su standard reali (W3C Draft Community Group Report, febbraio 2026).
+
+## Scopo
+
+1. **Mostrare WebMCP all'opera** su un caso d'uso commerciale credibile (catalogo prodotti, carrello, coupon, checkout), non su uno snippet astratto.
+2. **Confrontare i due percorsi di adozione**: il browser nativo (Chrome Canary EPP, `navigator.modelContext`) e il polyfill della community (`@mcp-b/global`) — *stesso codice di tool*, due bridge diversi, indicatori live in header per capirlo a colpo d'occhio.
+3. **Provare l'ergonomia "user-in-the-loop"**: il `checkout` chiama `agent.requestUserInteraction(...)` e fa apparire un modale di conferma. L'AI **non agisce di nascosto** — la UI manuale e quella agentica condividono lo stesso store.
+4. **Materiale di onboarding interno**: lo stack è volutamente minimo (Vite + React + Zustand) per essere leggibile in un'ora; tutta la logica WebMCP vive in ~5 file in `src/lib/`.
+
+## Cos'è WebMCP
+
+[WebMCP](https://github.com/webmachinelearning/webmcp) è una proposta di standard W3C (Web Machine Learning CG, editori Google + Microsoft) che permette a qualsiasi sito di **registrare tool** invocabili da agenti AI nel browser, senza scrivere uno scraper o pilotare la UI tramite DOM/screenshot. Disponibile in early preview in **Chrome 146 Canary** dietro flag. Per il contesto completo (storia, API, casi d'uso, confronto con MCP "classico") vedi [`RESEARCH.md`](RESEARCH.md).
 
 ## Quick start
 
@@ -165,3 +178,13 @@ Vite 6 · React 18 · TypeScript 5 · Tailwind CSS 3 · Zustand · Framer Motion
 
 **Il modale di checkout non appare quando l'agente chiama `checkout`**
 - Verifica che `CheckoutModal` sia mounted (è in `App.tsx`). Senza modale registrato, `requestCheckoutConfirmation` fa fallback a `window.confirm`.
+
+## Materiale di supporto
+
+- [`RESEARCH.md`](RESEARCH.md) — Cos'è WebMCP, come si confronta con MCP "classico", quali use case sblocca.
+- [`docs/presentazione.html`](docs/presentazione.html) — Slide deck HTML per la demo dal vivo.
+- [`docs/HOW-TO-IMPLEMENT.html`](docs/HOW-TO-IMPLEMENT.html) — Guida passo-passo per integrare WebMCP in un sito esistente.
+
+## Disclaimer
+
+**Bella Roma Coffee** è una torrefazione fittizia creata per scopi dimostrativi. Marchio, logo, prodotti e prezzi non si riferiscono ad alcuna azienda reale. WebMCP è una specifica W3C ancora in evoluzione: l'API mostrata può cambiare nelle future revisioni del Draft Community Group Report.
