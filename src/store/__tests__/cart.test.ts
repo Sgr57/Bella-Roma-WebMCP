@@ -94,4 +94,37 @@ describe("cart store", () => {
     expect(s.coupon).toBeNull();
     expect(s.activity).toEqual([]);
   });
+
+  it("addItem with different options creates a distinct line", () => {
+    useCartStore.getState().addItem("cappuccino", 1);
+    useCartStore.getState().addItem("cappuccino", 1, { size: "L" });
+    const items = useCartStore.getState().items;
+    expect(items).toHaveLength(2);
+    expect(items[0]).toEqual({ productId: "cappuccino", quantity: 1 });
+    expect(items[1]).toEqual({
+      productId: "cappuccino",
+      quantity: 1,
+      options: { size: "L" },
+    });
+  });
+
+  it("addItem with identical options merges quantity", () => {
+    useCartStore.getState().addItem("cappuccino", 1, { size: "L", milk: "milk-oat" });
+    useCartStore.getState().addItem("cappuccino", 2, { milk: "milk-oat", size: "L" });
+    const items = useCartStore.getState().items;
+    expect(items).toHaveLength(1);
+    expect(items[0].quantity).toBe(3);
+  });
+
+  it("subtotal includes size and milk modifiers", () => {
+    // cappuccino base 2.50, size L = +0.50, milk-oat = +0.50 -> 3.50
+    useCartStore.getState().addItem("cappuccino", 2, { size: "L", milk: "milk-oat" });
+    expect(useCartStore.getState().subtotal()).toBeCloseTo(7.0, 2);
+  });
+
+  it("subtotal handles size S and default milk gracefully", () => {
+    // americano base 2.20, size S = +0 -> 2.20
+    useCartStore.getState().addItem("americano", 1, { size: "S" });
+    expect(useCartStore.getState().subtotal()).toBeCloseTo(2.2, 2);
+  });
 });
