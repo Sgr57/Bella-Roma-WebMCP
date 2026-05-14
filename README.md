@@ -26,21 +26,38 @@ npm run dev
 
 Apri http://localhost:5173
 
-## Demo: collegare un agente AI
+## Guida al test passo-passo
 
-Due strade, **entrambe affidabili**, entrambe selezionabili dallo **stesso toggle pill in header** (`Relay · Off ⇄ Relay · Live/CDN`) o dal query param `?relay=true`. La pagina rileva il browser e instrada da sola al bridge giusto.
+Questa è la guida operativa: cosa fare, in che ordine, cosa aspettarsi a video. Pensata per **non tecnici** — chiunque sappia copia-incollare un comando ce la fa in ~10 minuti.
 
-| Browser | Bridge selezionato | Estensione? | Polyfill? |
-|---|---|---|---|
-| Chrome Canary 146+ (EPP) | `relay-client.ts` in-page (nostro) | no | no — usa `navigator.modelContext` nativo |
-| Chrome stable / qualunque | embed `@mcp-b/webmcp-local-relay` da CDN | no | sì (`@mcp-b/global`) |
-| Toggle off | (nessuno) | — | — |
+### Cosa ti serve prima di iniziare
 
-In tutti i casi il consumer è **Claude Desktop** (o qualunque client MCP stdio) tramite lo stesso relay locale `webmcp-local-relay` che gira su `127.0.0.1:9333`.
+- **Node.js 20+** installato → https://nodejs.org
+- **Claude Desktop** installato → https://claude.ai/download
+- **Un browser** aggiornato. Idealmente **Chrome stabile** (funziona col polyfill). Se hai **Chrome Canary 146+** vedrai anche il path nativo `navigator.modelContext`.
 
-### Configurazione comune — Claude Desktop
+### Step 1 — Avvia il sito demo
 
-Apri (o crea) `~/Library/Application Support/Claude/claude_desktop_config.json` su macOS (o l'equivalente Windows/Linux) e aggiungi sotto `mcpServers`:
+In un terminale, dalla cartella del progetto:
+
+```bash
+npm install   # solo la prima volta
+npm run dev
+```
+
+Apri **http://localhost:5173** nel browser. Vedrai la home di Bella Roma Coffee con catalogo, carrello a destra e — in alto a destra nella utility strip dell'header — due **pill di stato** (`WebMCP · …` e `Relay · Off`).
+
+### Step 2 — Installa il relay MCP in Claude Desktop
+
+Il "relay" è il ponte che fa parlare Claude Desktop con la pagina nel browser. **Si configura una sola volta.**
+
+Apri (o crea) il file di configurazione di Claude Desktop:
+
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+Inserisci questo contenuto (o aggiungi la voce `webmcp-local-relay` sotto `mcpServers` se ne hai già altre):
 
 ```json
 {
@@ -53,24 +70,94 @@ Apri (o crea) `~/Library/Application Support/Claude/claude_desktop_config.json` 
 }
 ```
 
-Riavvia completamente Claude Desktop (⌘Q + riapri — non basta chiudere la finestra). Verifica che il relay sia in ascolto:
+**Chiudi completamente Claude Desktop e riaprilo** (su macOS: ⌘Q — non basta chiudere la finestra). Al riavvio Claude scarica ed esegue il relay da solo.
+
+Controllo rapido che il relay sia attivo (opzionale, da terminale):
 
 ```bash
 lsof -nP -i :9333
-# devi vedere: node ... TCP 127.0.0.1:9333 (LISTEN)
+# devi vedere una riga: node ... TCP 127.0.0.1:9333 (LISTEN)
 ```
 
-### Apri la demo
+Se non vedi nulla → vai a **Troubleshooting** in fondo.
 
-```
-http://localhost:5173/?relay=true
-```
+### Step 3 — Attiva il bridge nella pagina
 
-(oppure carica `http://localhost:5173/` e clicca la pill **Relay · Off** nella utility strip dell'header per attivarlo — fa lo stesso, ricaricando.)
+Torna su **http://localhost:5173** e clicca la pill **`Relay · Off`** in alto a destra. La pagina si ricarica con `?relay=true` nell'URL. La pill diventa:
 
-### Gli indicatori in header
+- **`Relay · Live`** (verde) → sei su Chrome Canary con WebMCP nativo
+- **`Relay · CDN`** (verde) → sei su Chrome stabile, parte il polyfill
 
-La barra utility (la striscia navy sotto la promo bar) mostra **due pill** affiancate. Sono pill testuali con un puntino colorato — niente più cerchi-emoji.
+Se vedi giallo/ambra (`connecting`, `closed`, `No API`) → **Troubleshooting**.
+
+### Step 4 — Verifica che Claude veda i tool
+
+Apri **Claude Desktop** e scrivi:
+
+> *Mostrami le sorgenti WebMCP collegate.*
+
+Claude deve elencare la tab **"Bella Roma Coffee"** con i suoi **7 tool** (`search_products`, `get_product`, `add_to_cart`, `remove_from_cart`, `apply_coupon`, `get_cart`, `checkout`).
+
+Se Claude dice "nessuna sorgente collegata", ricontrolla Step 2 e Step 3.
+
+### Step 5 — Fai un giro di prova
+
+Cinque scenari pronti. Copia-incolla in Claude Desktop, **guarda la pagina mentre Claude lavora**: il carrello cambia in diretta e il **Tool Activity Log** in basso a destra registra ogni chiamata.
+
+1. **Filtro da linguaggio naturale**
+   > *Qualcosa di leggero e fruttato, senza latte, sotto i 4 euro. Aggiungilo al carrello.*
+
+   Claude filtra il catalogo e mette un prodotto coerente in carrello. **Cosa guardare**: `search_products` → `add_to_cart` nel log; una nuova riga nel carrello.
+
+2. **Sostituzione live su esaurito**
+   > *Vorrei un cappuccino con latte di soia.*
+
+   La soia è marcata "esaurita". L'agente riceve un errore strutturato con `alternatives[]` e propone avena o mandorla **prima** di aggiungere. **Cosa guardare**: l'AI non sbatte la testa contro il muro — recupera da sola.
+
+3. **Bundle multi-item con vincoli**
+   > *Componi un ordine colazione per 3 persone, max 15 euro, uno deve essere decaffeinato.*
+
+   Più chiamate `add_to_cart`. **Cosa guardare**: 3 righe nel carrello che rispettano il budget e includono almeno un decaf.
+
+4. **Customizzazione fine**
+   > *Cappuccino grande con latte d'avena, senza zucchero.*
+
+   Una sola `add_to_cart` con `options` complete. **Cosa guardare**: sotto il nome nel carrello compare "Grande · Avena · Senza zucchero".
+
+5. **Coupon + checkout con conferma utente** *(il momento clou)*
+   > *Applica il coupon BENVENUTO e completa l'ordine.*
+
+   `apply_coupon` applica lo sconto, poi `checkout` chiama `agent.requestUserInteraction` e apre **un modale di conferma a video**. **Cosa guardare**: l'AI **non** conferma da sola — clicchi tu. È il punto chiave di WebMCP: l'azione irreversibile resta sotto controllo umano.
+
+Per ricominciare da zero: clicca **`Reset demo`** in header. Svuota carrello, coupon e log.
+
+> Suggerimento: nel banner **"I più chiesti"** in alto alla pagina trovi i prompt principali pronti al click — un click li copia negli appunti, poi incolli in Claude Desktop.
+
+### Cosa osservare durante il test
+
+Tre segnali ti dicono che tutto funziona:
+
+- **Le due pill in header** sono verdi (`WebMCP · Native`/`Polyfill` + `Relay · Live`/`CDN`).
+- **Il Tool Activity Log** in basso a destra registra in tempo reale ogni invocazione (nome tool, args, risultato, timestamp).
+- **Il carrello** riflette esattamente le azioni di Claude — perché agente e utente leggono/scrivono dallo **stesso store**. Niente DOM scraping, niente screenshot.
+
+---
+
+## Riferimento tecnico: i due bridge
+
+Due strade, **entrambe affidabili**, entrambe selezionabili dallo **stesso toggle pill in header** (`Relay · Off ⇄ Relay · Live/CDN`) o dal query param `?relay=true`. La pagina rileva il browser e instrada da sola al bridge giusto.
+
+| Browser | Bridge selezionato | Estensione? | Polyfill? |
+|---|---|---|---|
+| Chrome Canary 146+ (EPP) | `relay-client.ts` in-page (nostro) | no | no — usa `navigator.modelContext` nativo |
+| Chrome stable / qualunque | embed `@mcp-b/webmcp-local-relay` da CDN | no | sì (`@mcp-b/global`) |
+| Toggle off | (nessuno) | — | — |
+
+In tutti i casi il consumer è **Claude Desktop** (o qualunque client MCP stdio) tramite lo stesso relay locale `webmcp-local-relay` su `127.0.0.1:9333`.
+
+### Tabella completa degli indicatori in header
+
+La utility strip (la striscia navy sotto la promo bar) mostra **due pill** affiancate. Sono pill testuali con un puntino colorato.
 
 | Pill | Stato | Significato |
 |---|---|---|
@@ -88,24 +175,6 @@ La pill **Relay** è anche un **toggle**: cliccarla aggiunge/rimuove `?relay=tru
 Combo attese durante la demo:
 - **Chrome Canary EPP**: `WebMCP · Native` + `Relay · Live`.
 - **Chrome stable**: `WebMCP · Polyfill` + `Relay · CDN`.
-
-### Verifica end-to-end
-
-In Claude Desktop chiedi:
-
-> *"List the connected WebMCP sources"*
-
-Deve elencare la tab **"Bella Roma Coffee"** con i 7 tool. Poi prova uno dei prompt del banner **"I più chiesti"** in alto (clicca per copiare). I 7 prompt sono pensati per mostrare capacità WebMCP diverse:
-
-- *"Qualcosa di leggero e fruttato, senza latte, sotto i 4 euro"* — filtri compositi da linguaggio naturale
-- *"Sto prendendo un cappuccino, abbinaci qualcosa di dolce ma non pesante"* — pairing cross-categoria
-- *"Vorrei un cappuccino con latte di soia"* — sostituzione live su disponibilità (la soia è esaurita)
-- *"Componi un ordine colazione per 3 persone, max 15 euro, uno deve essere decaffeinato"* — bundle multi-item con vincoli
-- *"Mi è piaciuto il Filtro Etiopia, voglio portarmene a casa 250g"* — cross-modal bar → take-home
-- *"Cappuccino grande con latte d'avena, senza zucchero"* — customizzazione drink
-- *"Cosa va bene con quello che ho già nel carrello?"* — awareness del carrello
-
-L'agente invoca i tool, vedrai i prodotti volare nel carrello, le sostituzioni proposte sulla disponibilità, e al `checkout` apparirà un modale di conferma — momento clou: l'AI non agisce alle tue spalle.
 
 ### Come funzionano i due bridge
 
@@ -161,14 +230,14 @@ Tutto il routing tra i due bridge è in `src/lib/relay.ts` → `connectRelay(mod
 
 Ogni `Product` ha campi opzionali ricchi: `intensity` (1-10), `origin`, `flavor_notes[]`, `dietary[]`, `temperature`, `tags[]`, `time_of_day[]`, `pairings[]` (id di prodotti consigliati in pairing), `related_products[]` (varianti cross-modal: drink → chicchi/capsule equivalenti), `available`, `alternatives[]` (id di sostituti coerenti se esaurito), `options` (size con price modifier, milk che referenzia `milk_option` items, sweetness). Dettagli in [`src/lib/products.ts`](src/lib/products.ts).
 
-## Test
+## Test unitari (sviluppo)
 
 ```bash
 npm test            # esegue Vitest una volta
 npm run test:watch  # watch mode
 ```
 
-Test su `store/cart`, `lib/products`, `lib/webmcp` (catalogo, store, tool adapter). Niente test E2E: la verifica visuale + il dry-run con un agente vero sono sufficienti per una demo.
+Test su `store/cart`, `lib/products`, `lib/webmcp` (catalogo, store, tool adapter). Niente test E2E: la verifica visuale + il dry-run con un agente vero (vedi **Guida al test passo-passo** sopra) sono sufficienti per una demo.
 
 ## Architettura
 
