@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="it" xml:lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Bella Roma Coffee — Demo WebMCP</title>
+  <style>
+
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+  <style type="text/css">:root {
+color-scheme: light;
+--fg: #1f2328;
+--muted: #59636e;
+--bg: #ffffff;
+--bg-soft: #f6f8fa;
+--border: #d1d9e0;
+--accent: #6b3a1f;
+--accent-soft: #f1e7df;
+--code-bg: #f6f8fa;
+--code-fg: #1f2328;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+font-size: 16px;
+line-height: 1.6;
+color: var(--fg);
+background: var(--bg);
+margin: 0;
+padding: 2.5rem 1.25rem;
+-webkit-font-smoothing: antialiased;
+}
+main, body > * {
+max-width: 880px;
+margin-left: auto;
+margin-right: auto;
+}
+h1, h2, h3, h4, h5, h6 {
+font-weight: 600;
+line-height: 1.25;
+margin: 1.8em 0 0.6em;
+color: var(--fg);
+}
+h1 {
+font-size: 2.1em;
+padding-bottom: 0.3em;
+border-bottom: 1px solid var(--border);
+margin-top: 0;
+}
+h2 {
+font-size: 1.5em;
+padding-bottom: 0.3em;
+border-bottom: 1px solid var(--border);
+}
+h3 { font-size: 1.2em; }
+h4 { font-size: 1.05em; }
+p, ul, ol, blockquote, table, pre { margin: 0 0 1em; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+ul, ol { padding-left: 1.6em; }
+li + li { margin-top: 0.2em; }
+blockquote {
+margin: 0 0 1em;
+padding: 0.4em 1em;
+color: var(--muted);
+background: var(--accent-soft);
+border-left: 4px solid var(--accent);
+border-radius: 4px;
+}
+blockquote > :last-child { margin-bottom: 0; }
+code, pre, kbd, samp {
+font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, Liberation Mono, monospace;
+font-size: 0.92em;
+}
+:not(pre) > code {
+background: var(--code-bg);
+border-radius: 4px;
+padding: 0.15em 0.4em;
+color: var(--code-fg);
+border: 1px solid var(--border);
+}
+pre {
+background: var(--code-bg);
+border: 1px solid var(--border);
+border-radius: 6px;
+padding: 0.9em 1em;
+overflow-x: auto;
+line-height: 1.5;
+}
+pre code {
+background: transparent;
+border: 0;
+padding: 0;
+color: inherit;
+white-space: pre;
+}
+table {
+width: 100%;
+border-collapse: collapse;
+display: block;
+overflow-x: auto;
+}
+th, td {
+border: 1px solid var(--border);
+padding: 0.45em 0.8em;
+text-align: left;
+vertical-align: top;
+}
+th {
+background: var(--bg-soft);
+font-weight: 600;
+}
+hr {
+border: 0;
+border-top: 1px solid var(--border);
+margin: 2em 0;
+}
+img { max-width: 100%; height: auto; }
+#TOC {
+background: var(--bg-soft);
+border: 1px solid var(--border);
+border-radius: 6px;
+padding: 0.6em 1.2em 0.8em;
+margin-bottom: 2em;
+}
+#TOC > ul { padding-left: 1.2em; margin: 0; }
+#TOC ul ul { margin-top: 0.2em; }
+#TOC a { color: var(--fg); }
+#TOC a:hover { color: var(--accent); }
+@media (prefers-color-scheme: dark) {
+:root {
+color-scheme: dark;
+--fg: #e6edf3;
+--muted: #9198a1;
+--bg: #0d1117;
+--bg-soft: #161b22;
+--border: #30363d;
+--accent: #d2a679;
+--accent-soft: #1f1611;
+--code-bg: #161b22;
+--code-fg: #e6edf3;
+}
+}
+</style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Bella Roma Coffee — Demo WebMCP</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#bella-roma-coffee--demo-webmcp" id="toc-bella-roma-coffee--demo-webmcp">Bella Roma Coffee — Demo
+WebMCP</a>
+<ul>
+<li><a href="#scopo" id="toc-scopo">Scopo</a></li>
+<li><a href="#cosè-webmcp" id="toc-cosè-webmcp">Cos&#39;è WebMCP</a></li>
+<li><a href="#quick-start" id="toc-quick-start">Quick start</a></li>
+<li><a href="#guida-al-test-passo-passo" id="toc-guida-al-test-passo-passo">Guida al test passo-passo</a></li>
+<li><a href="#riferimento-tecnico-i-due-bridge" id="toc-riferimento-tecnico-i-due-bridge">Riferimento tecnico: i due
+bridge</a></li>
+<li><a href="#tool-esposti" id="toc-tool-esposti">Tool esposti</a></li>
+<li><a href="#test-unitari-sviluppo" id="toc-test-unitari-sviluppo">Test
+unitari (sviluppo)</a></li>
+<li><a href="#architettura" id="toc-architettura">Architettura</a></li>
+<li><a href="#stack" id="toc-stack">Stack</a></li>
+<li><a href="#note-per-la-demo-dal-vivo" id="toc-note-per-la-demo-dal-vivo">Note per la demo dal vivo</a></li>
+<li><a href="#troubleshooting" id="toc-troubleshooting">Troubleshooting</a></li>
+<li><a href="#materiale-di-supporto" id="toc-materiale-di-supporto">Materiale di supporto</a></li>
+<li><a href="#disclaimer" id="toc-disclaimer">Disclaimer</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="bella-roma-coffee--demo-webmcp">Bella Roma Coffee — Demo
+WebMCP</h1>
+<blockquote>
+<p><strong>Proof-of-Concept</strong>: una vetrina e‑commerce
+<em>agent-ready</em>. Un agente AI (Claude Desktop) ordina caffè,
+applica coupon e fa checkout su una pagina React <strong>senza</strong>
+vedere il DOM, senza scraper, senza pilotare il cursore — chiama
+direttamente i tool che la pagina espone.</p>
+</blockquote>
+<p>🌐 <strong>Demo live</strong>: <a href="https://bella-roma-web-mcp.vercel.app/">https://bella-roma-web-mcp.vercel.app/</a>
+— apri il link, attiva il toggle <code>Relay · Off → CDN</code> in
+header e collega Claude Desktop (vedi Step 2 più sotto). Niente da
+installare lato sito.</p>
+<p>Single-page React app che simula la torrefazione fittizia
+<strong>Bella Roma Coffee</strong> ed espone le sue azioni come
+<strong>9 tool WebMCP</strong> invocabili da un agente AI nel browser
+tramite <code>navigator.modelContext</code>. Pensata per una demo da 60
+secondi davanti a stakeholder non tecnici, ma costruita su standard
+reali (W3C Draft Community Group Report, febbraio 2026).</p>
+<p>Il catalogo include 27 prodotti (13 drink, 4 food, 3 chicchi
+take-home, 2 capsule, 5 opzioni latte di cui una &quot;esaurita&quot; per
+dimostrare la sostituzione). Ogni prodotto è annotato con intensità,
+origine, note aromatiche, dietary, tag, pairing, prodotti correlati e
+opzioni di personalizzazione (size / latte / zucchero). Il set di tool
+resta volutamente minimale: l&#39;agente compone primitive piccole invece di
+chiamare endpoint di alto livello.</p>
+<h2 id="scopo">Scopo</h2>
+<ol type="1">
+<li><strong>Mostrare WebMCP all&#39;opera</strong> su un caso d&#39;uso
+commerciale credibile (catalogo prodotti, carrello, coupon, checkout),
+non su uno snippet astratto.</li>
+<li><strong>Confrontare i due percorsi di adozione</strong>: il browser
+nativo (Chrome Canary EPP, <code>navigator.modelContext</code>) e il
+polyfill della community (<code>@mcp-b/global</code>) — <em>stesso
+codice di tool</em>, due bridge diversi, indicatori live in header per
+capirlo a colpo d&#39;occhio.</li>
+<li><strong>Provare l&#39;ergonomia &quot;user-in-the-loop&quot;</strong>: il
+<code>checkout</code> chiama
+<code>agent.requestUserInteraction(...)</code> e fa apparire un modale
+di conferma. L&#39;AI <strong>non agisce di nascosto</strong> — la UI
+manuale e quella agentica condividono lo stesso store.</li>
+<li><strong>Materiale di onboarding interno</strong>: lo stack è
+volutamente minimo (Vite + React + Zustand) per essere leggibile in
+un&#39;ora; tutta la logica WebMCP vive in ~5 file in
+<code>src/lib/</code>.</li>
+</ol>
+<h2 id="cosè-webmcp">Cos&#39;è WebMCP</h2>
+<p><a href="https://github.com/webmachinelearning/webmcp">WebMCP</a> è
+una proposta di standard W3C (Web Machine Learning CG, editori Google +
+Microsoft) che permette a qualsiasi sito di <strong>registrare
+tool</strong> invocabili da agenti AI nel browser, senza scrivere uno
+scraper o pilotare la UI tramite DOM/screenshot. Disponibile in early
+preview in <strong>Chrome 146 Canary</strong> dietro flag. Per il
+contesto completo (storia, API, casi d&#39;uso, confronto con MCP
+&quot;classico&quot;) vedi <a href="RESEARCH.md"><code>RESEARCH.md</code></a>.</p>
+<h2 id="quick-start">Quick start</h2>
+<p><strong>In locale:</strong></p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> install</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run dev</span></code></pre></div>
+<p>Apri http://localhost:5173</p>
+<p><strong>Senza installare nulla:</strong> apri direttamente la
+versione deployata su <a href="https://bella-roma-web-mcp.vercel.app/">https://bella-roma-web-mcp.vercel.app/</a>
+— funziona con Chrome stabile via polyfill <code>@mcp-b/global</code> da
+CDN.</p>
+<h2 id="guida-al-test-passo-passo">Guida al test passo-passo</h2>
+<p>Questa è la guida operativa: cosa fare, in che ordine, cosa
+aspettarsi a video. Pensata per <strong>non tecnici</strong> — chiunque
+sappia copia-incollare un comando ce la fa in ~10 minuti.</p>
+<h3 id="cosa-ti-serve-prima-di-iniziare">Cosa ti serve prima di
+iniziare</h3>
+<ul>
+<li><strong>Node.js 20+</strong> installato → <a href="https://nodejs.org">https://nodejs.org</a></li>
+<li><strong>Claude Desktop</strong> installato → <a href="https://claude.ai/download">https://claude.ai/download</a></li>
+<li><strong>Un browser</strong> aggiornato. Idealmente <strong>Chrome
+stabile</strong> (funziona col polyfill). Se hai <strong>Chrome Canary
+146+</strong> vedrai anche il path nativo
+<code>navigator.modelContext</code>.</li>
+</ul>
+<h3 id="step-1--avvia-il-sito-demo">Step 1 — Avvia il sito demo</h3>
+<p>In un terminale, dalla cartella del progetto:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> install   <span class="co"># solo la prima volta</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run dev</span></code></pre></div>
+<p>Apri <strong>http://localhost:5173</strong> nel browser. Vedrai la
+home di Bella Roma Coffee con catalogo, carrello a destra e — in alto a
+destra nella utility strip dell&#39;header — due <strong>pill di
+stato</strong> (<code>WebMCP · …</code> e <code>Relay · Off</code>).</p>
+<h3 id="step-2--installa-il-relay-mcp-in-claude-desktop">Step 2 —
+Installa il relay MCP in Claude Desktop</h3>
+<p>Il &quot;relay&quot; è il ponte che fa parlare Claude Desktop con la pagina nel
+browser. <strong>Si configura una sola volta.</strong></p>
+<p>Apri (o crea) il file di configurazione di Claude Desktop:</p>
+<ul>
+<li><strong>macOS</strong>:
+<code>~/Library/Application Support/Claude/claude_desktop_config.json</code></li>
+<li><strong>Windows</strong>:
+<code>%APPDATA%\Claude\claude_desktop_config.json</code></li>
+<li><strong>Linux</strong>:
+<code>~/.config/Claude/claude_desktop_config.json</code></li>
+</ul>
+<p>Inserisci questo contenuto (o aggiungi la voce
+<code>webmcp-local-relay</code> sotto <code>mcpServers</code> se ne hai
+già altre):</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;mcpServers&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;webmcp-local-relay&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;command&quot;</span><span class="fu">:</span> <span class="st">&quot;npx&quot;</span><span class="fu">,</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;args&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="st">&quot;-y&quot;</span><span class="ot">,</span> <span class="st">&quot;@mcp-b/webmcp-local-relay@latest&quot;</span><span class="ot">]</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p><strong>Chiudi completamente Claude Desktop e riaprilo</strong> (su
+macOS: ⌘Q — non basta chiudere la finestra). Al riavvio Claude scarica
+ed esegue il relay da solo.</p>
+<p>Controllo rapido che il relay sia attivo (opzionale, da
+terminale):</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">lsof</span> <span class="at">-nP</span> <span class="at">-i</span> :9333</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># devi vedere una riga: node ... TCP 127.0.0.1:9333 (LISTEN)</span></span></code></pre></div>
+<p>Se non vedi nulla → vai a <strong>Troubleshooting</strong> in
+fondo.</p>
+<h3 id="step-3--attiva-il-bridge-nella-pagina">Step 3 — Attiva il bridge
+nella pagina</h3>
+<p>Torna su <strong>http://localhost:5173</strong> e clicca la pill
+<strong><code>Relay · Off</code></strong> in alto a destra. La pagina si
+ricarica con <code>?relay=true</code> nell&#39;URL. La pill diventa:</p>
+<ul>
+<li><strong><code>Relay · Live</code></strong> (verde) → sei su Chrome
+Canary con WebMCP nativo</li>
+<li><strong><code>Relay · CDN</code></strong> (verde) → sei su Chrome
+stabile, parte il polyfill</li>
+</ul>
+<p>Se vedi giallo/ambra (<code>connecting</code>, <code>closed</code>,
+<code>No API</code>) → <strong>Troubleshooting</strong>.</p>
+<h3 id="step-4--verifica-che-claude-veda-i-tool">Step 4 — Verifica che
+Claude veda i tool</h3>
+<p>Apri <strong>Claude Desktop</strong> e scrivi:</p>
+<blockquote>
+<p><em>Mostrami le sorgenti WebMCP collegate.</em></p>
+</blockquote>
+<p>Claude deve elencare la tab <strong>&quot;Bella Roma Coffee&quot;</strong> con
+i suoi <strong>9 tool</strong> (<code>search_products</code>,
+<code>get_product</code>, <code>add_to_cart</code>,
+<code>remove_from_cart</code>, <code>apply_coupon</code>,
+<code>remove_coupon</code>, <code>clear_cart</code>,
+<code>get_cart</code>, <code>checkout</code>).</p>
+<p>Se Claude dice &quot;nessuna sorgente collegata&quot;, ricontrolla Step 2 e
+Step 3.</p>
+<h3 id="step-5--fai-un-giro-di-prova">Step 5 — Fai un giro di prova</h3>
+<p>Sei scenari pronti. Copia-incolla in Claude Desktop, <strong>guarda
+la pagina mentre Claude lavora</strong>: il carrello cambia in diretta e
+il <strong>Tool Activity Log</strong> in basso a destra registra ogni
+chiamata.</p>
+<ol type="1">
+<li><p><strong>Filtro da linguaggio naturale</strong></p>
+<blockquote>
+<p><em>Qualcosa di leggero e fruttato, senza latte, sotto i 4 euro.
+Aggiungilo al carrello.</em></p>
+</blockquote>
+<p>Claude filtra il catalogo e mette un prodotto coerente in carrello.
+<strong>Cosa guardare</strong>: <code>search_products</code> →
+<code>add_to_cart</code> nel log; una nuova riga nel carrello.</p></li>
+<li><p><strong>Sostituzione live su esaurito</strong></p>
+<blockquote>
+<p><em>Vorrei un cappuccino con latte di soia.</em></p>
+</blockquote>
+<p>La soia è marcata &quot;esaurita&quot;. L&#39;agente riceve un errore strutturato
+con <code>alternatives[]</code> e propone avena o mandorla
+<strong>prima</strong> di aggiungere. <strong>Cosa guardare</strong>:
+l&#39;AI non sbatte la testa contro il muro — recupera da sola.</p></li>
+<li><p><strong>Bundle multi-item con vincoli</strong></p>
+<blockquote>
+<p><em>Componi un ordine colazione per 3 persone, max 15 euro, uno deve
+essere decaffeinato.</em></p>
+</blockquote>
+<p>Più chiamate <code>add_to_cart</code>. <strong>Cosa
+guardare</strong>: 3 righe nel carrello che rispettano il budget e
+includono almeno un decaf.</p></li>
+<li><p><strong>Customizzazione fine</strong></p>
+<blockquote>
+<p><em>Cappuccino grande con latte d&#39;avena, senza zucchero.</em></p>
+</blockquote>
+<p>Una sola <code>add_to_cart</code> con <code>options</code> complete.
+<strong>Cosa guardare</strong>: sotto il nome nel carrello compare
+&quot;Grande · Avena · Senza zucchero&quot;.</p></li>
+<li><p><strong>Coupon + checkout con conferma utente</strong> <em>(il
+momento clou)</em></p>
+<blockquote>
+<p><em>Applica il coupon BENVENUTO e completa l&#39;ordine.</em></p>
+</blockquote>
+<p><code>apply_coupon</code> applica lo sconto, poi
+<code>checkout</code> chiama <code>agent.requestUserInteraction</code> e
+apre <strong>un modale di conferma a video</strong>. <strong>Cosa
+guardare</strong>: l&#39;AI <strong>non</strong> conferma da sola — clicchi
+tu. È il punto chiave di WebMCP: l&#39;azione irreversibile resta sotto
+controllo umano.</p></li>
+<li><p><strong>Reset conversazionale</strong></p>
+<blockquote>
+<p><em>Annulla tutto, ricomincio da capo.</em></p>
+</blockquote>
+<p>L&#39;agente chiama <code>clear_cart</code> (svuota carrello + rimuove
+coupon in un colpo solo). <strong>Cosa guardare</strong>: il carrello si
+azzera dal log, niente loop di <code>remove_from_cart</code> per ogni
+riga.</p></li>
+</ol>
+<p>Per ricominciare da zero anche fuori da Claude: clicca
+<strong><code>Reset demo</code></strong> in header. Svuota carrello,
+coupon e log.</p>
+<blockquote>
+<p>Suggerimento: nel banner <strong>&quot;I più chiesti&quot;</strong> in alto
+alla pagina trovi i prompt principali pronti al click — un click li
+copia negli appunti, poi incolli in Claude Desktop.</p>
+</blockquote>
+<h3 id="cosa-osservare-durante-il-test">Cosa osservare durante il
+test</h3>
+<p>Tre segnali ti dicono che tutto funziona:</p>
+<ul>
+<li><strong>Le due pill in header</strong> sono verdi
+(<code>WebMCP · Native</code>/<code>Polyfill</code> +
+<code>Relay · Live</code>/<code>CDN</code>).</li>
+<li><strong>Il Tool Activity Log</strong> in basso a destra registra in
+tempo reale ogni invocazione (nome tool, args, risultato,
+timestamp).</li>
+<li><strong>Il carrello</strong> riflette esattamente le azioni di
+Claude — perché agente e utente leggono/scrivono dallo <strong>stesso
+store</strong>. Niente DOM scraping, niente screenshot.</li>
+</ul>
+<hr />
+<h2 id="riferimento-tecnico-i-due-bridge">Riferimento tecnico: i due
+bridge</h2>
+<p>Due strade, <strong>entrambe affidabili</strong>, entrambe
+selezionabili dallo <strong>stesso toggle pill in header</strong>
+(<code>Relay · Off ⇄ Relay · Live/CDN</code>) o dal query param
+<code>?relay=true</code>. La pagina rileva il browser e instrada da sola
+al bridge giusto.</p>
+<table>
+<thead>
+<tr>
+<th>Browser</th>
+<th>Bridge selezionato</th>
+<th>Estensione?</th>
+<th>Polyfill?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chrome Canary 146+ (EPP)</td>
+<td><code>relay-client.ts</code> in-page (nostro)</td>
+<td>no</td>
+<td>no — usa <code>navigator.modelContext</code> nativo</td>
+</tr>
+<tr>
+<td>Chrome stable / qualunque</td>
+<td>embed <code>@mcp-b/webmcp-local-relay</code> da CDN</td>
+<td>no</td>
+<td>sì (<code>@mcp-b/global</code>)</td>
+</tr>
+<tr>
+<td>Toggle off</td>
+<td>(nessuno)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>In tutti i casi il consumer è <strong>Claude Desktop</strong> (o
+qualunque client MCP stdio) tramite lo stesso relay locale
+<code>webmcp-local-relay</code> su <code>127.0.0.1:9333</code>.</p>
+<h3 id="tabella-completa-degli-indicatori-in-header">Tabella completa
+degli indicatori in header</h3>
+<p>La utility strip (la striscia navy sotto la promo bar) mostra
+<strong>due pill</strong> affiancate. Sono pill testuali con un puntino
+colorato.</p>
+<table>
+<thead>
+<tr>
+<th>Pill</th>
+<th>Stato</th>
+<th>Significato</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WebMCP · Native</strong></td>
+<td>🟢 verde, pulsante</td>
+<td><code>navigator.modelContext</code> nativo (Chrome Canary,
+<code>ModelContext</code>)</td>
+</tr>
+<tr>
+<td><strong>WebMCP · Polyfill</strong></td>
+<td>🟡 ambra</td>
+<td>Polyfill <code>@mcp-b/global</code> caricato (Chrome stable)</td>
+</tr>
+<tr>
+<td><strong>WebMCP · Offline</strong></td>
+<td>⚪ idle</td>
+<td>Nessuna API WebMCP — né nativa né polyfill</td>
+</tr>
+<tr>
+<td><strong>Relay · Off</strong></td>
+<td>⚪ idle</td>
+<td>Toggle disattivato — la pagina non parla con Claude Desktop</td>
+</tr>
+<tr>
+<td><strong>Relay · Live</strong></td>
+<td>🟢 verde</td>
+<td>Path nativo, WebSocket verso <code>127.0.0.1:9333</code>
+<code>open</code></td>
+</tr>
+<tr>
+<td><strong>Relay · connecting / closed / error</strong></td>
+<td>🟡 ambra</td>
+<td>Path nativo, WebSocket non ancora <code>open</code> (in apertura,
+chiuso, o errore)</td>
+</tr>
+<tr>
+<td><strong>Relay · CDN</strong></td>
+<td>🟢 verde</td>
+<td>Path compat, embed <code>@mcp-b/webmcp-local-relay</code> caricato
+da jsDelivr</td>
+</tr>
+<tr>
+<td><strong>Relay · No API</strong></td>
+<td>🟡 ambra</td>
+<td>Relay richiesto ma nessuna API WebMCP disponibile</td>
+</tr>
+</tbody>
+</table>
+<p>La pill <strong>Relay</strong> è anche un <strong>toggle</strong>:
+cliccarla aggiunge/rimuove <code>?relay=true</code> e ricarica la
+pagina. Accanto, il bottone <strong>Reset demo</strong> svuota carrello,
+coupon e Tool Activity Log.</p>
+<p>Combo attese durante la demo:</p>
+<ul>
+<li><strong>Chrome Canary EPP</strong>: <code>WebMCP · Native</code> +
+<code>Relay · Live</code>.</li>
+<li><strong>Chrome stable</strong>: <code>WebMCP · Polyfill</code> +
+<code>Relay · CDN</code>.</li>
+</ul>
+<h3 id="come-funzionano-i-due-bridge">Come funzionano i due bridge</h3>
+<pre class="mermaid"><code>flowchart LR
+    CD[&quot;💻 Claude Desktop&lt;br/&gt;(client MCP stdio)&quot;]
+    RL[&quot;webmcp-local-relay&lt;br/&gt;node, avviato da Claude&lt;br/&gt;WS server :9333&quot;]
+
+    CD &lt;-- &quot;stdio MCP&quot; --&gt; RL
+
+    subgraph Canary[&quot;🟢 Chrome Canary EPP — path nativo&quot;]
+        direction TB
+        NAT[&quot;navigator.modelContext&lt;br/&gt;constructor: ModelContext&lt;br/&gt;registerTool × 6 (W3C spec)&quot;]
+        RC[&quot;src/lib/relay-client.ts&lt;br/&gt;WebSocket diretto&lt;br/&gt;hello · tools/list · invoke&lt;br/&gt;backoff 2s→30s&quot;]
+        RC -. &quot;dispatch in-page&lt;br/&gt;tool.execute(args, fakeClient)&quot; .- NAT
+    end
+
+    subgraph Stable[&quot;🟡 Chrome stable — path compat&quot;]
+        direction TB
+        POL[&quot;@mcp-b/global polyfill&lt;br/&gt;provideContext({ tools })&quot;]
+        EMB[&quot;embed.js da jsDelivr CDN&lt;br/&gt;iframe hidden&lt;br/&gt;apre WS → 9333&quot;]
+        EMB -. &quot;espone i tool registrati&lt;br/&gt;nel polyfill&quot; .- POL
+    end
+
+    RL &lt;-- &quot;ws://127.0.0.1:9333&quot; --&gt; RC
+    RL &lt;-- &quot;ws://127.0.0.1:9333&quot; --&gt; EMB
+
+    classDef ext fill:#f5f5f4,stroke:#78716c,color:#1c1917;
+    classDef native fill:#dcfce7,stroke:#16a34a,color:#14532d;
+    classDef compat fill:#fef3c7,stroke:#d97706,color:#78350f;
+    class CD,RL ext;
+    class NAT,RC native;
+    class POL,EMB compat;</code></pre>
+<p>Tutto il routing tra i due bridge è in <code>src/lib/relay.ts</code>
+→ <code>connectRelay(mode)</code>. La detection del mode
+(<code>native</code> vs <code>polyfill</code> vs
+<code>unavailable</code>) è in <code>src/lib/polyfill.ts</code>:
+distingue native vs polyfill confrontando
+<code>constructor.name === &quot;ModelContext&quot;</code> e l&#39;assenza di
+<code>provideContext</code>, perché il solo
+<code>&#39;modelContext&#39; in navigator</code> non basta — alcuni setup
+caricano il polyfill come side-effect anche su browser nativi.</p>
+<h2 id="tool-esposti">Tool esposti</h2>
+<p>7 tool totali. Filosofia di design: <strong>primitive piccole, agente
+compositore.</strong> I tre tool &quot;core&quot; sono ricchi; ogni scenario
+complesso (bundle, pairing, upsell, sostituzione) viene composto
+dall&#39;agente combinandoli, senza endpoint di alto livello.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Cosa fa</th>
+<th>Conferma utente</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>search_products</code></td>
+<td>Filtra catalogo: categoria, tipo
+(drink/food/beans/capsule/milk_option), prezzo max, tag, dietary, note
+aromatiche, origine, intensità min/max, momento della giornata,
+in-stock-only, testo libero</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>get_product</code></td>
+<td>Scheda completa di un prodotto: attributi, disponibilità,
+alternative se esaurito, pairing, prodotti correlati cross-modal,
+opzioni di personalizzazione</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>add_to_cart</code></td>
+<td>Aggiunge un prodotto al carrello con <code>options</code> (size,
+milk, sweetness). Ritorna errore strutturato con
+<code>alternatives[]</code> se il prodotto o l&#39;opzione latte richiesta è
+ESAURITA</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>remove_from_cart</code></td>
+<td>Rimuove riga</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>apply_coupon</code></td>
+<td>Applica <code>BENVENUTO</code> (-10%) o <code>STUDENTI</code> (-20%
+max €5)</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>get_cart</code></td>
+<td>Ritorna stato carrello (incluse opzioni per riga e prezzi con
+modifier)</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>checkout</code></td>
+<td>Conferma ordine</td>
+<td><strong>sì</strong> (modale
+<code>requestUserInteraction</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="schema-prodotto">Schema prodotto</h3>
+<p>Ogni <code>Product</code> ha campi opzionali ricchi:
+<code>intensity</code> (1-10), <code>origin</code>,
+<code>flavor_notes[]</code>, <code>dietary[]</code>,
+<code>temperature</code>, <code>tags[]</code>,
+<code>time_of_day[]</code>, <code>pairings[]</code> (id di prodotti
+consigliati in pairing), <code>related_products[]</code> (varianti
+cross-modal: drink → chicchi/capsule equivalenti),
+<code>available</code>, <code>alternatives[]</code> (id di sostituti
+coerenti se esaurito), <code>options</code> (size con price modifier,
+milk che referenzia <code>milk_option</code> items, sweetness). Dettagli
+in <a href="src/lib/products.ts"><code>src/lib/products.ts</code></a>.</p>
+<h2 id="test-unitari-sviluppo">Test unitari (sviluppo)</h2>
+<div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> test            <span class="co"># esegue Vitest una volta</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run test:watch  <span class="co"># watch mode</span></span></code></pre></div>
+<p>Test su <code>store/cart</code>, <code>lib/products</code>,
+<code>lib/webmcp</code> (catalogo, store, tool adapter). Niente test
+E2E: la verifica visuale + il dry-run con un agente vero (vedi
+<strong>Guida al test passo-passo</strong> sopra) sono sufficienti per
+una demo.</p>
+<h2 id="architettura">Architettura</h2>
+<ul>
+<li><strong>Zustand</strong> (<code>src/store/cart.ts</code>) è la
+<em>single source of truth</em> per carrello, coupon applicato e log
+delle invocazioni dei tool. Le righe del carrello supportano
+<code>options</code> (size, milk, sweetness): righe con options
+identiche si fondono; righe con options diverse restano distinte.
+<code>lineUnitPrice(item)</code> calcola il prezzo includendo il
+<code>size.price_modifier</code> e il <code>price</code> del milk option
+scelto come modificatore.</li>
+<li><strong><code>src/lib/products.ts</code></strong> ospita lo schema
+<code>Product</code> esteso e il catalogo a 27 entry (5 tipi: drink,
+food, beans, capsule, milk_option). Helper <code>getProductById</code> e
+<code>getProductsByType</code>.</li>
+<li><strong><code>src/lib/prompts.ts</code></strong> è la lista
+condivisa dei 7 prompt suggeriti (<code>TOP_PROMPTS</code>) e dei 3
+selezionati per l&#39;empty state del carrello
+(<code>CART_EMPTY_PROMPT_IDS</code>).</li>
+<li><strong><code>src/lib/webmcp.ts</code></strong> è
+l&#39;<strong>adapter</strong> tra l&#39;API WebMCP e lo store. Espone
+<code>buildTools()</code> (7 tool) e <code>registerTools()</code> che è
+<strong>dual-API</strong>: usa
+<code>navigator.modelContext.registerTool(t)</code> (W3C spec, nativo)
+oppure <code>provideContext({tools})</code> (polyfill
+<code>@mcp-b/global</code>) a seconda di chi è presente. Idempotente
+(guard <code>registered</code> + dedup via <code>getTools()</code>
+quando disponibile).</li>
+<li><strong><code>src/lib/polyfill.ts</code></strong> rileva la modalità
+(<code>native</code> / <code>polyfill</code> / <code>unavailable</code>)
+e carica <code>@mcp-b/global</code> solo se serve. Distingue native vs
+polyfill anche quando entrambi appaiono presenti, leggendo
+<code>constructor.name</code> e l&#39;assenza di
+<code>provideContext</code>.</li>
+<li><strong><code>src/lib/relay.ts</code></strong> (orchestratore) —
+legge il flag <code>?relay=true</code>, chiama
+<code>connectRelay(mode)</code> che instrada al bridge giusto:
+<ul>
+<li><code>mode === &quot;native&quot;</code> → import dinamico di
+<code>relay-client.ts</code> (vedi sotto).</li>
+<li><code>mode === &quot;polyfill&quot;</code> → inietta lo
+<code>&lt;script&gt;</code> dell&#39;embed CDN
+(<code>@mcp-b/webmcp-local-relay/dist/browser/embed.js</code>).</li>
+</ul></li>
+<li><strong><code>src/lib/relay-client.ts</code></strong> (~165 LoC) —
+implementa il protocollo del relay direttamente: <code>WebSocket</code>
+verso <code>127.0.0.1:9333</code>, handshake <code>hello</code> +
+<code>tools/list</code>, gestione <code>invoke/result</code>,
+<code>ping/pong</code>, reconnect con backoff (2s → 30s). Nessuna
+dipendenza da <code>executeTool</code> non-spec di Chrome: dispatcha
+localmente chiamando <code>tool.execute(args, fakeClient)</code>. Espone
+<code>onRelayState(...)</code> per l&#39;indicatore in Header.</li>
+<li><strong><code>src/lib/checkout-bridge.ts</code></strong> è un
+piccolo event-bridge: il tool <code>checkout</code> invoca
+<code>requestCheckoutConfirmation(total)</code> dentro
+<code>agent.requestUserInteraction(...)</code> se l&#39;agent è disponibile,
+altrimenti chiama il bridge diretto (il modale React si apre lo
+stesso).</li>
+<li>I componenti React (<code>Header</code> a 3 layer in stile Lavazza,
+<code>Hero</code>, <code>DemoBanner</code>, <code>ProductGrid</code>,
+<code>ProductCard</code>, <code>Cart</code>, <code>CartItem</code>,
+<code>ToolActivityLog</code>, <code>CheckoutModal</code>,
+<code>Footer</code>) leggono dallo store: la UI manuale (click) e quella
+agentica (tool) passano dagli stessi update — <em>esattamente il
+vantaggio chiave di WebMCP</em>. Le due pill di stato (WebMCP + Relay) e
+il toggle relay vivono nella <strong>utility strip</strong>
+dell&#39;<code>Header</code>.</li>
+<li><code>DemoBanner</code> mostra i 7 prompt come pill compatte
+cliccabili (copia negli appunti con feedback inline). Il
+<code>Cart</code> empty state ripropone 3 prompt action-oriented
+(filtra, componi bundle, customizza) come pill estese.</li>
+<li><code>ProductCard</code> legge l&#39;intensità per-prodotto, mostra fino
+a 2 tag pill e un badge &quot;Esaurito&quot; con CTA disabilitata se
+<code>!available</code>. <code>ProductGrid</code> raggruppa il catalogo
+in tre sezioni (drink, food, take-home) con chip filtro
+<code>Tutto / Al bar / Pasticceria / Da asporto</code>.
+<code>CartItem</code> mostra le opzioni selezionate (&quot;Grande · Avena ·
+Senza zucchero&quot;) sotto il nome.</li>
+</ul>
+<p>Design completo della demo iniziale in <a href="docs/superpowers/specs/2026-05-12-bella-roma-coffee-demo-design.md"><code>docs/superpowers/specs/2026-05-12-bella-roma-coffee-demo-design.md</code></a>,
+piano in <a href="docs/superpowers/plans/2026-05-12-bella-roma-coffee-demo.md"><code>docs/superpowers/plans/2026-05-12-bella-roma-coffee-demo.md</code></a>.</p>
+<p>Catalog expansion (7 scenari wow, catalogo a 27 prodotti,
+<code>get_product</code>): spec in <a href="docs/superpowers/specs/2026-05-13-catalog-expansion-design.md"><code>docs/superpowers/specs/2026-05-13-catalog-expansion-design.md</code></a>,
+piano in <a href="docs/superpowers/plans/2026-05-13-catalog-expansion.md"><code>docs/superpowers/plans/2026-05-13-catalog-expansion.md</code></a>.</p>
+<h2 id="stack">Stack</h2>
+<p>Vite 6 · React 18 · TypeScript 5 · Tailwind CSS 3 · Zustand · Framer
+Motion · <code>@mcp-b/global</code> polyfill (solo path compat) · Vitest
++ Testing Library</p>
+<h2 id="note-per-la-demo-dal-vivo">Note per la demo dal vivo</h2>
+<ul>
+<li><strong>Banner &quot;I più chiesti&quot;</strong>: 7 prompt pronti al
+copia-incolla (click sulla pill → clipboard, flash arancione di
+conferma). Un sottoinsieme di 3 prompt (filtra, componi, customizza)
+compare anche nell&#39;empty state del carrello come scorciatoia
+contestuale.</li>
+<li><strong>Reset demo</strong>: bottone in header. Svuota carrello,
+rimuove coupon, pulisce il Tool Activity Log.</li>
+<li><strong>Tool Activity Log</strong>: pannello in basso a destra che
+mostra in tempo reale ogni invocazione di tool (nome, args, risultato,
+timestamp).</li>
+<li><strong>Fallback manuale</strong>: il bottone &quot;Checkout&quot; in carrello
+funziona anche senza agente (utile per smoke test e in caso di problemi
+di connessione il giorno della demo).</li>
+<li><strong>Niente backend</strong>: catalogo e coupon sono in memoria
+(<code>src/lib/products.ts</code>). Refresh = stato pulito.</li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<p><strong>&quot;There are no connected WebMCP sources&quot; in Claude
+Desktop</strong></p>
+<ul>
+<li>Verifica che la pill <strong>Relay</strong> in header non sia su
+<code>Off</code> — deve mostrare <code>Live</code> (nativo) o
+<code>CDN</code> (polyfill). In alternativa controlla che
+<code>?relay=true</code> sia nell&#39;URL.</li>
+<li>Riavvia Claude Desktop completamente dopo aver modificato
+<code>claude_desktop_config.json</code> (⌘Q, non basta chiudere la
+finestra).</li>
+<li>Verifica che il relay sia in ascolto:
+<code>lsof -nP -i :9333</code>. Devi vedere <code>node ... LISTEN</code>
+e una riga <code>Google ... ESTABLISHED</code> per ogni tab
+connessa.</li>
+<li>Ricarica la tab <strong>dopo</strong> che Claude Desktop è ripartito
+(la connessione WebSocket viene aperta al <code>load</code>).</li>
+</ul>
+<p><strong>Path nativo (Canary): la pill resta
+<code>Relay · connecting</code> o <code>Relay · closed</code> /
+<code>error</code></strong></p>
+<ul>
+<li>Significa che <code>relay-client.ts</code> non riesce a connettersi
+a <code>ws://127.0.0.1:9333</code>. Causa più comune: Claude Desktop non
+in esecuzione o config <code>mcpServers</code> non applicata. Backoff
+esponenziale fino a 30s tra tentativi
+(<code>INITIAL_RECONNECT_MS = 2000</code>,
+<code>MAX_RECONNECT_MS = 30000</code>).</li>
+<li>Cross-check con <code>lsof -nP -i :9333</code>: se vedi solo
+<code>LISTEN</code> senza <code>ESTABLISHED</code> dopo qualche secondo
+dal load, la connessione non è andata a buon fine.</li>
+</ul>
+<p><strong>Path compat (Chrome stable): la pill <code>Relay · CDN</code>
+è verde ma Claude Desktop non vede i tool</strong></p>
+<ul>
+<li>L&#39;embed CDN usa il selettore <code>[data-webmcp-relay]</code> per la
+propria idempotenza: assicurati di non averlo applicato altrove a mano.
+Il nostro loader (<code>src/lib/relay.ts</code>) usa
+<code>data-webmcp-embed-loader</code> apposta per evitare la
+collisione.</li>
+<li>Controlla in DevTools → Network che <code>embed.js</code> da
+<code>cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest</code> sia
+caricato senza errori CORS.</li>
+</ul>
+<p><strong>La pill resta <code>WebMCP · Offline</code></strong></p>
+<ul>
+<li>Significa che né l&#39;API nativa né il polyfill sono presenti. Verifica
+che <code>npm install</code> sia andato a buon fine (il polyfill
+<code>@mcp-b/global</code> è una dipendenza npm; senza, su Chrome stable
+il fallback non parte).</li>
+<li>Su Canary, controlla che il flag <em>Experimental Web Platform
+features</em> (o l&#39;EPP WebMCP) sia attivo in
+<code>chrome://flags</code>.</li>
+</ul>
+<p><strong>La pill mostra <code>Relay · No API</code></strong></p>
+<ul>
+<li>Hai attivato il toggle relay (<code>?relay=true</code>) ma né l&#39;API
+nativa né il polyfill sono caricati. Risolvi prima il caso
+<code>WebMCP · Offline</code> qui sopra: il relay senza API esposta non
+ha tool da pubblicare.</li>
+</ul>
+<p><strong>Il modale di checkout non appare quando l&#39;agente chiama
+<code>checkout</code></strong></p>
+<ul>
+<li>Verifica che <code>CheckoutModal</code> sia mounted (è in
+<code>App.tsx</code>). Senza modale registrato,
+<code>requestCheckoutConfirmation</code> fa fallback a
+<code>window.confirm</code>.</li>
+<li>Sul path nativo <code>requestUserInteraction</code> esiste
+sull&#39;<code>agent</code> reale; sul path relay-client il dispatcher usa
+un <code>fakeClient</code> che esegue la callback immediatamente — il
+modale React parte comunque via event-bridge
+(<code>src/lib/checkout-bridge.ts</code>).</li>
+</ul>
+<h2 id="materiale-di-supporto">Materiale di supporto</h2>
+<ul>
+<li><a href="RESEARCH.md"><code>RESEARCH.md</code></a> — Cos&#39;è WebMCP,
+come si confronta con MCP &quot;classico&quot;, quali use case sblocca.</li>
+<li><a href="docs/presentazione.html"><code>docs/presentazione.html</code></a>
+— Slide deck HTML per la demo dal vivo.</li>
+<li><a href="docs/HOW-TO-IMPLEMENT.html"><code>docs/HOW-TO-IMPLEMENT.html</code></a>
+— Guida passo-passo per integrare WebMCP in un sito esistente.</li>
+</ul>
+<h2 id="disclaimer">Disclaimer</h2>
+<p><strong>Bella Roma Coffee</strong> è una torrefazione fittizia creata
+per scopi dimostrativi. Marchio, logo, prodotti e prezzi non si
+riferiscono ad alcuna azienda reale. WebMCP è una specifica W3C ancora
+in evoluzione: l&#39;API mostrata può cambiare nelle future revisioni del
+Draft Community Group Report.</p>
+</body>
+</html>
