@@ -8,7 +8,15 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "imagegen:test:editorial": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style editorial --test",
+    "imagegen:test:dipinto": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style dipinto --test",
+    "imagegen:all:editorial": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style editorial --all",
+    "imagegen:all:dipinto": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style dipinto --all",
+    "imagegen:dry:editorial": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style editorial --test --dry-run",
+    "imagegen:dry:dipinto": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style dipinto --test --dry-run",
+    "imagegen:cf:test:editorial": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style editorial --test --provider cloudflare",
+    "imagegen:cf:test:dipinto": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style dipinto --test --provider cloudflare"
   },
   "dependencies": {
     "@mcp-b/global": "^2.3.2",
@@ -27,6 +35,9 @@
     "jsdom": "^29.1.1",
     "postcss": "^8.5.14",
     "tailwindcss": "^3.4.19",
+    "@types/node": "^22.10.2",
+    "sharp": "^0.33.5",
+    "tsx": "^4.19.2",
     "typescript": "^5.6.3",
     "vite": "^6.0.3",
     "vitest": "^4.1.6",

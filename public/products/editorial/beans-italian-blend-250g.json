@@ -1,0 +1,14 @@
+{
+  "id": "beans-italian-blend-250g",
+  "provider": "openai",
+  "model": "gpt-image-1",
+  "prompt": "Premium editorial product photography. Top-down 1:1 composition, single subject perfectly centered on a warm cream paper background (hex #F5F0E6). Soft diffused morning light from the upper-left, gentle natural shadow falling to lower-right, shallow depth of field with the subject in crisp focus. Hyper-detailed, magazine-quality, refined Italian café aesthetic. Subject: an open small burlap sack of whole roasted coffee beans from Italia, beans spilling gently around its base, a few isolated beans in soft focus, evoking chocolate and nutty flavor notes. No text, no logos, no watermarks, no captions, no packaging branding, no human hands.",
+  "negativePrompt": "text, watermark, logo, brand name, packaging label, hands, fingers, cluttered, multiple subjects, busy background, neon colors, low quality, blurry, oversaturated",
+  "seed": 1950060318,
+  "quality": "medium",
+  "format": "webp",
+  "size": 512,
+  "encodeQuality": 88,
+  "generatedAt": "2026-05-14T12:53:07.511Z",
+  "durationMs": 15772
+}

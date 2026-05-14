@@ -1,0 +1,14 @@
+{
+  "id": "shakerato",
+  "provider": "openai",
+  "model": "gpt-image-1",
+  "prompt": "Premium editorial product photography. Top-down 1:1 composition, single subject perfectly centered on a warm cream paper background (hex #F5F0E6). Soft diffused morning light from the upper-left, gentle natural shadow falling to lower-right, shallow depth of field with the subject in crisp focus. Hyper-detailed, magazine-quality, refined Italian café aesthetic. Subject: a chilled coupé martini glass filled with a creamy iced coffee, dense espresso foam on top, frosted glass exterior, with crystal-clear ice cubes visible, condensation droplets on the glass. No text, no logos, no watermarks, no captions, no packaging branding, no human hands.",
+  "negativePrompt": "text, watermark, logo, brand name, packaging label, hands, fingers, cluttered, multiple subjects, busy background, neon colors, low quality, blurry, oversaturated",
+  "seed": 1808384411,
+  "quality": "medium",
+  "format": "webp",
+  "size": 512,
+  "encodeQuality": 88,
+  "generatedAt": "2026-05-14T12:52:00.238Z",
+  "durationMs": 16422
+}

@@ -33,3 +33,16 @@ dist-ssr
 /*.jpeg
 /*.jpg
 /*.png
+
+# imagegen tool: outputs, deps, local credentials
+tools/imagegen/out/
+tools/imagegen/node_modules/
+tools/imagegen/.env
+tools/imagegen/.env.local
+
+# generic local credentials (safety net for any consumer)
+.env
+.env.local
+
+# Claude Code local session state
+.claude/

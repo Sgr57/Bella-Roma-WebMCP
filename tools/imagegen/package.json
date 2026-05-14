@@ -1,0 +1,26 @@
+{
+  "name": "@local/imagegen",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Agnostic image generation utility on top of Cloudflare Workers AI (Flux). Drop-in, project-independent.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "bin": {
+    "imagegen": "./src/cli.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./cli": "./src/cli.ts"
+  },
+  "scripts": {
+    "cli": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

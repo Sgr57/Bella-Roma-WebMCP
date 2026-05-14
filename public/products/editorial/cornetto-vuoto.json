@@ -1,0 +1,14 @@
+{
+  "id": "cornetto-vuoto",
+  "provider": "openai",
+  "model": "gpt-image-1",
+  "prompt": "Premium editorial product photography. Top-down 1:1 composition, single subject perfectly centered on a warm cream paper background (hex #F5F0E6). Soft diffused morning light from the upper-left, gentle natural shadow falling to lower-right, shallow depth of field with the subject in crisp focus. Hyper-detailed, magazine-quality, refined Italian café aesthetic. Subject: a single golden flaky Italian cornetto pastry, crescent shape, on a small white plate, dusting of icing sugar. No text, no logos, no watermarks, no captions, no packaging branding, no human hands.",
+  "negativePrompt": "text, watermark, logo, brand name, packaging label, hands, fingers, cluttered, multiple subjects, busy background, neon colors, low quality, blurry, oversaturated",
+  "seed": 1261766927,
+  "quality": "medium",
+  "format": "webp",
+  "size": 512,
+  "encodeQuality": 88,
+  "generatedAt": "2026-05-14T12:52:18.699Z",
+  "durationMs": 14354
+}

@@ -143,8 +143,14 @@ export function ProductCard({ product }: Props) {
         </div>
       )}
 
-      <div className="h-40 flex items-center justify-center mb-3 mt-2">
-        <span className="text-7xl">{product.emoji}</span>
+      <div className="h-40 flex items-center justify-center mb-3 mt-2 overflow-hidden">
+        <img
+          src={`/products/editorial/${product.id}.webp`}
+          alt={product.name}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-full object-contain"
+        />
       </div>
 
       <p className="text-[11px] uppercase tracking-[0.15em] font-light text-coffee-mid mb-1 text-center">

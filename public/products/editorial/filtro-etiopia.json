@@ -1,0 +1,14 @@
+{
+  "id": "filtro-etiopia",
+  "provider": "openai",
+  "model": "gpt-image-1",
+  "prompt": "Premium editorial product photography. Top-down 1:1 composition, single subject perfectly centered on a warm cream paper background (hex #F5F0E6). Soft diffused morning light from the upper-left, gentle natural shadow falling to lower-right, shallow depth of field with the subject in crisp focus. Hyper-detailed, magazine-quality, refined Italian café aesthetic. Subject: a glass pour-over carafe filled with a clear, bright amber filter coffee, a single rising tendril of steam, on a wooden coaster, with delicate steam wisps rising naturally. No text, no logos, no watermarks, no captions, no packaging branding, no human hands.",
+  "negativePrompt": "text, watermark, logo, brand name, packaging label, hands, fingers, cluttered, multiple subjects, busy background, neon colors, low quality, blurry, oversaturated",
+  "seed": 901499443,
+  "quality": "medium",
+  "format": "webp",
+  "size": 512,
+  "encodeQuality": 88,
+  "generatedAt": "2026-05-14T12:42:52.303Z",
+  "durationMs": 16973
+}
