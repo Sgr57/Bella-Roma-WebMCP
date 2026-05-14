@@ -54,7 +54,11 @@ describe("WebMCP tools", () => {
     );
     expect(res.isError).toBeFalsy();
     expect(useCartStore.getState().items).toEqual([
-      { productId: "espresso", quantity: 2 },
+      {
+        productId: "espresso",
+        quantity: 2,
+        options: { sweetness: "normal" },
+      },
     ]);
     expect(useCartStore.getState().activity).toHaveLength(1);
   });

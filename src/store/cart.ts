@@ -30,6 +30,8 @@ interface CartState {
   items: CartItem[];
   coupon: string | null;
   activity: ToolActivity[];
+  customizerProductId: string | null;
+  customizerDraft: CartItemOptions;
   addItem: (
     productId: string,
     quantity: number,
@@ -44,6 +46,29 @@ interface CartState {
   subtotal: () => number;
   discount: () => number;
   total: () => number;
+  openCustomizer: (productId: string) => void;
+  closeCustomizer: () => void;
+  setCustomizerOption: <K extends keyof CartItemOptions>(
+    key: K,
+    value: CartItemOptions[K],
+  ) => void;
+  confirmCustomizerAdd: () => boolean;
+}
+
+export function defaultOptionsFor(productId: string): CartItemOptions {
+  const p = getProductById(productId);
+  const out: CartItemOptions = {};
+  if (!p?.options) return out;
+  if (p.options.size) out.size = p.options.size.default;
+  if (p.options.milk) out.milk = p.options.milk.default;
+  if (p.options.sweetness) out.sweetness = p.options.sweetness.default;
+  return out;
+}
+
+export function isCustomizable(productId: string): boolean {
+  const p = getProductById(productId);
+  if (!p?.options) return false;
+  return Boolean(p.options.size || p.options.milk || p.options.sweetness);
 }
 
 function normalizeOptions(o?: CartItemOptions): CartItemOptions | undefined {
@@ -84,11 +109,14 @@ export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   coupon: null,
   activity: [],
+  customizerProductId: null,
+  customizerDraft: {},
 
   addItem: (productId, quantity, options) => {
     if (!getProductById(productId)) return false;
     if (quantity < 1) return false;
-    const norm = normalizeOptions(options);
+    const withDefaults = { ...defaultOptionsFor(productId), ...options };
+    const norm = normalizeOptions(withDefaults);
     const key = optionsKey(norm);
     set((state) => {
       const idx = state.items.findIndex(
@@ -173,5 +201,29 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   total: () => {
     return Math.max(0, get().subtotal() - get().discount());
+  },
+
+  openCustomizer: (productId) => {
+    if (!getProductById(productId)) return;
+    set({
+      customizerProductId: productId,
+      customizerDraft: defaultOptionsFor(productId),
+    });
+  },
+
+  closeCustomizer: () =>
+    set({ customizerProductId: null, customizerDraft: {} }),
+
+  setCustomizerOption: (key, value) =>
+    set((state) => ({
+      customizerDraft: { ...state.customizerDraft, [key]: value },
+    })),
+
+  confirmCustomizerAdd: () => {
+    const { customizerProductId, customizerDraft, addItem } = get();
+    if (!customizerProductId) return false;
+    const okAdd = addItem(customizerProductId, 1, customizerDraft);
+    set({ customizerProductId: null, customizerDraft: {} });
+    return okAdd;
   },
 }));

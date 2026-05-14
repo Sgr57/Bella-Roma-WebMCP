@@ -4,6 +4,7 @@ import { DemoBanner } from "./components/DemoBanner";
 import { Hero } from "./components/Hero";
 import { ProductGrid } from "./components/ProductGrid";
 import { Cart } from "./components/Cart";
+import { Customizer } from "./components/Customizer";
 import { ToolActivityLog } from "./components/ToolActivityLog";
 import { CheckoutModal } from "./components/CheckoutModal";
 import { Footer } from "./components/Footer";
@@ -65,6 +66,7 @@ export default function App() {
       <Footer />
       <ToolActivityLog />
       <CheckoutModal />
+      <Customizer />
     </div>
   );
 }
