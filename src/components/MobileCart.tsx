@@ -39,6 +39,18 @@ export function MobileCart() {
     lastCountRef.current = items.length;
   }, [items.length, collapsed]);
 
+  // Lock body scroll while expanded on mobile, so the page can't scroll
+  // underneath when the user drags the sheet down (no backdrop here).
+  useEffect(() => {
+    if (collapsed || typeof window === "undefined") return;
+    if (!window.matchMedia("(max-width: 1023.98px)").matches) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [collapsed]);
+
   const copyPrompt = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -73,6 +85,26 @@ export function MobileCart() {
   const isEmpty = items.length === 0;
 
   return (
+    <>
+      <AnimatePresence>
+        {!collapsed && (
+          <motion.div
+            key="mobile-cart-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setCollapsed(true)}
+            className="fixed inset-0 z-40 lg:hidden"
+            style={{
+              background: "rgba(5,20,50,0.28)",
+              backdropFilter: "blur(3px)",
+              WebkitBackdropFilter: "blur(3px)",
+            }}
+            aria-hidden="true"
+          />
+        )}
+      </AnimatePresence>
     <motion.div
       drag={collapsed ? false : "y"}
       dragControls={dragControls}
@@ -392,5 +424,6 @@ export function MobileCart() {
         )}
       </AnimatePresence>
     </motion.div>
+    </>
   );
 }
