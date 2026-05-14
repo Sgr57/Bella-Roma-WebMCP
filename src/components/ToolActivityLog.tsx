@@ -46,7 +46,7 @@ export function ToolActivityLog() {
           : {}
       }
       transition={{ duration: 0.7 }}
-      className="fixed bottom-4 left-4 w-72 bg-coffee-dark/95 backdrop-blur-sm text-white rounded-2xl shadow-lavazza-md overflow-hidden flex flex-col border border-white/10 z-40"
+      className="fixed bottom-4 left-4 w-72 bg-coffee-dark/95 backdrop-blur-sm text-white rounded-2xl shadow-lavazza-md overflow-hidden hidden md:flex flex-col border border-white/10 z-40"
     >
       <button
         type="button"

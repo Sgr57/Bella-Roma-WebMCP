@@ -50,7 +50,7 @@ export function DemoBanner() {
   };
 
   return (
-    <section className="max-w-7xl mx-auto px-6 pt-4 pb-6">
+    <section className="hidden md:block max-w-7xl mx-auto px-6 pt-4 pb-6">
       <div className="rounded-xl bg-lavazza-soft/60 border border-lavazza-line/70 px-4 py-2.5">
         <div className="flex items-center gap-3 flex-wrap">
           <p className="text-[10px] uppercase tracking-[0.18em] font-medium text-coffee-mid shrink-0">

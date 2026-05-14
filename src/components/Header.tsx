@@ -80,17 +80,8 @@ export function Header({ connection, relay, relayVariant, relayState }: Props) {
 
   return (
     <header className="border-b border-lavazza-line">
-      {/* Layer 1 — promo bar (white, 40px) */}
-      <div className="bg-white px-6 h-10 flex items-center justify-center text-xs text-coffee-mid">
-        <span aria-hidden className="mr-2">🎁</span>
-        <span>
-          <strong className="font-semibold text-lavazza-deep">Per te:</strong>{" "}
-          consegna gratuita aggiungendo almeno €10,00 al carrello.
-        </span>
-      </div>
-
       {/* Layer 2 — utility strip (navy, 40px) */}
-      <div className="bg-coffee-dark text-white h-10 flex items-center px-6">
+      <div className="bg-coffee-dark text-white h-10 hidden md:flex items-center px-6">
         <div className="max-w-7xl mx-auto w-full flex items-center justify-end gap-3">
           {/* WebMCP status pill */}
           <span
@@ -149,20 +140,20 @@ export function Header({ connection, relay, relayVariant, relayState }: Props) {
       </div>
 
       {/* Layer 3 — main brand bar (white, ~80px) */}
-      <div className="bg-white px-6 h-20 flex items-center">
-        <div className="max-w-7xl mx-auto w-full grid grid-cols-3 items-center">
-          <div className="flex items-center gap-3 justify-self-start">
+      <div className="bg-white px-4 md:px-6 h-16 md:h-20 flex items-center">
+        <div className="max-w-7xl mx-auto w-full flex md:grid md:grid-cols-3 items-center">
+          <div className="flex items-center gap-2.5 md:gap-3 md:justify-self-start">
             <img
               src="/brand/mark.webp"
               alt="Bella Roma"
-              className="h-12 w-12 object-contain"
+              className="h-10 w-10 md:h-12 md:w-12 object-contain"
               decoding="async"
             />
             <div>
-              <h1 className="font-display text-2xl font-bold text-lavazza-deep tracking-tight leading-none">
+              <h1 className="font-display text-xl md:text-2xl font-bold text-lavazza-deep tracking-tight leading-none">
                 Bella Roma
               </h1>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-coffee-mid mt-1.5">
+              <p className="hidden sm:block text-[10px] uppercase tracking-[0.2em] text-coffee-mid mt-1.5">
                 Roma · Italia · 1962
               </p>
             </div>

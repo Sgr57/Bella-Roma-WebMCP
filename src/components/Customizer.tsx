@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useDragControls } from "framer-motion";
 import { createPortal } from "react-dom";
 import { lineUnitPrice, useCartStore } from "../store/cart";
 import {
@@ -235,6 +235,7 @@ export function Customizer() {
   const isDesktop = useIsDesktop();
   const popoverRef = useRef<HTMLDivElement>(null);
   const pos = useAnchorPosition(activeId, popoverRef, isDesktop);
+  const dragControls = useDragControls();
 
   useEffect(() => {
     if (!activeId) return;
@@ -283,6 +284,14 @@ export function Customizer() {
           ) : (
             <motion.div
               key="sheet"
+              drag="y"
+              dragControls={dragControls}
+              dragListener={false}
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.4 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.y > 80 || info.velocity.y > 400) close();
+              }}
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
@@ -290,7 +299,13 @@ export function Customizer() {
               className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl px-6 pt-3 pb-8 max-w-2xl mx-auto"
               style={{ boxShadow: "0 -16px 50px rgba(2,20,35,0.18)" }}
             >
-              <div className="w-11 h-1 bg-lavazza-line rounded-full mx-auto mb-4" />
+              <div
+                onPointerDown={(e) => dragControls.start(e)}
+                className="-mx-6 px-6 pt-1 pb-3 touch-none cursor-grab active:cursor-grabbing"
+                aria-hidden="true"
+              >
+                <div className="w-11 h-1 bg-lavazza-line rounded-full mx-auto" />
+              </div>
               <CustomizerBody productId={activeId} />
             </motion.div>
           )}

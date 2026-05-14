@@ -4,6 +4,7 @@ import { DemoBanner } from "./components/DemoBanner";
 import { Hero } from "./components/Hero";
 import { ProductGrid } from "./components/ProductGrid";
 import { Cart } from "./components/Cart";
+import { MobileCart } from "./components/MobileCart";
 import { Customizer } from "./components/Customizer";
 import { ToolActivityLog } from "./components/ToolActivityLog";
 import { CheckoutModal } from "./components/CheckoutModal";
@@ -61,10 +62,13 @@ export default function App() {
       <DemoBanner />
       <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 p-4">
         <ProductGrid />
-        <Cart />
+        <div className="hidden lg:block">
+          <Cart />
+        </div>
       </main>
       <Footer />
       <ToolActivityLog />
+      <MobileCart />
       <CheckoutModal />
       <Customizer />
     </div>
