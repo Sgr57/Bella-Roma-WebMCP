@@ -17,6 +17,9 @@ export function Cart() {
   const [flash, setFlash] = useState(0);
   const lastCount = useRef(items.length);
   const [copiedPrompt, setCopiedPrompt] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [hasOverflowTop, setHasOverflowTop] = useState(false);
+  const [hasOverflowBottom, setHasOverflowBottom] = useState(false);
 
   const copyPrompt = async (text: string) => {
     try {
@@ -31,8 +34,32 @@ export function Cart() {
     }
   };
   useEffect(() => {
-    if (items.length > lastCount.current) setFlash((f) => f + 1);
+    if (items.length > lastCount.current) {
+      setFlash((f) => f + 1);
+      requestAnimationFrame(() => {
+        const el = listRef.current;
+        if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      });
+    }
     lastCount.current = items.length;
+  }, [items.length]);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const update = () => {
+      setHasOverflowTop(el.scrollTop > 1);
+      setHasOverflowBottom(el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    for (const child of Array.from(el.children)) ro.observe(child);
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro.disconnect();
+    };
   }, [items.length]);
 
   return (
@@ -49,9 +76,9 @@ export function Cart() {
           : {}
       }
       transition={{ duration: 0.8 }}
-      className="bg-white rounded-2xl shadow-lavazza border border-lavazza-line p-5 sticky top-4"
+      className="bg-white rounded-2xl shadow-lavazza border border-lavazza-line p-5 sticky top-4 max-h-[calc(100vh-2rem)] flex flex-col"
     >
-      <h2 className="font-display text-xl font-bold text-lavazza-deep mb-3">
+      <h2 className="font-display text-xl font-bold text-lavazza-deep mb-3 shrink-0">
         Carrello
       </h2>
       {items.length === 0 ? (
@@ -129,25 +156,96 @@ export function Cart() {
         </div>
       ) : (
         <>
-          <ul className="mb-3">
-            <AnimatePresence initial={false}>
-              {items.map((i) => (
+          <div className="relative flex-1 min-h-0 mb-3">
+            <div
+              ref={listRef}
+              className="h-full overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent_0,black_16px,black_calc(100%-16px),transparent_100%)]"
+            >
+              <ul>
+                <AnimatePresence initial={false}>
+                  {items.map((i) => (
+                    <motion.div
+                      key={i.productId}
+                      layout
+                      initial={{ opacity: 0, x: 40, scale: 0.9 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      exit={{ opacity: 0, x: 40, scale: 0.9 }}
+                      transition={{ type: "spring", stiffness: 320, damping: 28 }}
+                    >
+                      <CartItem item={i} />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </ul>
+            </div>
+            <AnimatePresence>
+              {hasOverflowTop && (
                 <motion.div
-                  key={i.productId}
-                  layout
-                  initial={{ opacity: 0, x: 40, scale: 0.9 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: 40, scale: 0.9 }}
-                  transition={{ type: "spring", stiffness: 320, damping: 28 }}
+                  key="overflow-top"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: [0, -3, 0] }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{
+                    opacity: { duration: 0.2 },
+                    y: {
+                      duration: 1.2,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      repeatDelay: 1.4,
+                    },
+                  }}
+                  className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 text-coffee-accent"
+                  aria-hidden="true"
                 >
-                  <CartItem item={i} />
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-3.5 h-3.5"
+                  >
+                    <polyline points="18 15 12 9 6 15" />
+                  </svg>
                 </motion.div>
-              ))}
+              )}
+              {hasOverflowBottom && (
+                <motion.div
+                  key="overflow-bottom"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: [0, 3, 0] }}
+                  exit={{ opacity: 0, y: 4 }}
+                  transition={{
+                    opacity: { duration: 0.2 },
+                    y: {
+                      duration: 1.2,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      repeatDelay: 1.4,
+                    },
+                  }}
+                  className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 text-coffee-accent"
+                  aria-hidden="true"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-3.5 h-3.5"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </motion.div>
+              )}
             </AnimatePresence>
-          </ul>
+          </div>
           <motion.div
             layout
-            className="text-sm space-y-1 border-t border-lavazza-line pt-3"
+            className="text-sm space-y-1 border-t border-lavazza-line pt-3 shrink-0"
           >
             <div className="flex justify-between text-coffee-mid">
               <span>Subtotale</span>
@@ -196,7 +294,7 @@ export function Cart() {
                 useCartStore.getState().checkout();
               }
             }}
-            className="w-full mt-4 bg-coffee-dark text-white py-3 rounded-pill text-xs uppercase tracking-[0.1em] font-semibold border-[1.5px] border-coffee-dark hover:bg-lavazza-deep hover:border-lavazza-deep transition"
+            className="w-full mt-4 bg-coffee-dark text-white py-3 rounded-pill text-xs uppercase tracking-[0.1em] font-semibold border-[1.5px] border-coffee-dark hover:bg-lavazza-deep hover:border-lavazza-deep transition shrink-0"
           >
             Procedi al checkout
           </button>
