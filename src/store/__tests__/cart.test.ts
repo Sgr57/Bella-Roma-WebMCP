@@ -14,18 +14,26 @@ describe("cart store", () => {
     expect(s.total()).toBe(0);
   });
 
-  it("addItem adds a new line", () => {
+  it("addItem adds a new line with product defaults applied", () => {
     useCartStore.getState().addItem("espresso", 2);
     const s = useCartStore.getState();
     expect(s.items).toHaveLength(1);
-    expect(s.items[0]).toEqual({ productId: "espresso", quantity: 2 });
+    expect(s.items[0]).toEqual({
+      productId: "espresso",
+      quantity: 2,
+      options: { sweetness: "normal" },
+    });
   });
 
   it("addItem merges quantity if product already in cart", () => {
     useCartStore.getState().addItem("espresso", 2);
     useCartStore.getState().addItem("espresso", 1);
     expect(useCartStore.getState().items).toEqual([
-      { productId: "espresso", quantity: 3 },
+      {
+        productId: "espresso",
+        quantity: 3,
+        options: { sweetness: "normal" },
+      },
     ]);
   });
 
@@ -100,11 +108,17 @@ describe("cart store", () => {
     useCartStore.getState().addItem("cappuccino", 1, { size: "L" });
     const items = useCartStore.getState().items;
     expect(items).toHaveLength(2);
-    expect(items[0]).toEqual({ productId: "cappuccino", quantity: 1 });
+    // first call: full defaults (M, milk-whole, normal)
+    expect(items[0]).toEqual({
+      productId: "cappuccino",
+      quantity: 1,
+      options: { size: "M", milk: "milk-whole", sweetness: "normal" },
+    });
+    // second call: L overrides default size; milk + sweetness still defaulted
     expect(items[1]).toEqual({
       productId: "cappuccino",
       quantity: 1,
-      options: { size: "L" },
+      options: { size: "L", milk: "milk-whole", sweetness: "normal" },
     });
   });
 

@@ -5,7 +5,7 @@ import {
   type SizeOption,
   type SweetnessOption,
 } from "./products";
-import { useCartStore } from "../store/cart";
+import { defaultOptionsFor, useCartStore } from "../store/cart";
 
 export type ToolResult = {
   content: Array<{ type: "text"; text: string }>;
@@ -426,7 +426,8 @@ export function buildTools(): Tool[] {
             .logToolCall("add_to_cart", args, "errore generico");
           return err(`Impossibile aggiungere "${product_id}".`);
         }
-        const optsLabel = formatOptionsLabel(options);
+        const effective = { ...defaultOptionsFor(product_id), ...options };
+        const optsLabel = formatOptionsLabel(effective);
         const msg = `Aggiunto: ${product.name} x${quantity}${optsLabel}.`;
         useCartStore.getState().logToolCall("add_to_cart", args, msg);
         return ok(msg);
