@@ -50,15 +50,61 @@ describe("cart store", () => {
 
   it("applyCoupon stores coupon code in uppercase", () => {
     useCartStore.getState().addItem("espresso", 2);
-    const ok = useCartStore.getState().applyCoupon("benvenuto");
-    expect(ok).toBe(true);
+    const res = useCartStore.getState().applyCoupon("benvenuto");
+    expect(res.ok).toBe(true);
+    expect(res.previous).toBeNull();
     expect(useCartStore.getState().coupon).toBe("BENVENUTO");
   });
 
-  it("applyCoupon returns false for invalid", () => {
-    const ok = useCartStore.getState().applyCoupon("NOPE");
-    expect(ok).toBe(false);
+  it("applyCoupon returns ok:false for invalid", () => {
+    const res = useCartStore.getState().applyCoupon("NOPE");
+    expect(res.ok).toBe(false);
     expect(useCartStore.getState().coupon).toBeNull();
+  });
+
+  it("applyCoupon reports the replaced coupon when overwriting", () => {
+    useCartStore.getState().addItem("espresso", 2);
+    useCartStore.getState().applyCoupon("BENVENUTO");
+    const res = useCartStore.getState().applyCoupon("STUDENTI");
+    expect(res.ok).toBe(true);
+    expect(res.previous).toBe("BENVENUTO");
+  });
+
+  it("removeItem with options removes the matching line only", () => {
+    useCartStore.getState().addItem("cappuccino", 1, { milk: "milk-oat" });
+    useCartStore.getState().addItem("cappuccino", 1, { milk: "milk-almond" });
+    expect(useCartStore.getState().items).toHaveLength(2);
+    useCartStore.getState().removeItem("cappuccino", { milk: "milk-oat" });
+    const items = useCartStore.getState().items;
+    expect(items).toHaveLength(1);
+    expect(items[0].options?.milk).toBe("milk-almond");
+  });
+
+  it("quantityFor sums across lines or matches a specific options key", () => {
+    useCartStore.getState().addItem("cappuccino", 1, { milk: "milk-oat" });
+    useCartStore.getState().addItem("cappuccino", 2, { milk: "milk-almond" });
+    expect(useCartStore.getState().quantityFor("cappuccino")).toBe(3);
+    expect(
+      useCartStore.getState().quantityFor("cappuccino", { milk: "milk-oat" }),
+    ).toBe(1);
+  });
+
+  it("clearCart empties items and coupon but preserves activity", () => {
+    useCartStore.getState().addItem("espresso", 1);
+    useCartStore.getState().applyCoupon("BENVENUTO");
+    useCartStore.getState().logToolCall("x", {}, "y");
+    useCartStore.getState().clearCart();
+    const s = useCartStore.getState();
+    expect(s.items).toEqual([]);
+    expect(s.coupon).toBeNull();
+    expect(s.activity).toHaveLength(1);
+  });
+
+  it("clearCoupon returns true if a coupon was present", () => {
+    useCartStore.getState().addItem("espresso", 1);
+    useCartStore.getState().applyCoupon("BENVENUTO");
+    expect(useCartStore.getState().clearCoupon()).toBe(true);
+    expect(useCartStore.getState().clearCoupon()).toBe(false);
   });
 
   it("subtotal sums items", () => {

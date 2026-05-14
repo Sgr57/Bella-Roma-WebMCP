@@ -56,7 +56,7 @@ export function CartItem({ item }: Props) {
           €{(unit * item.quantity).toFixed(2)}
         </span>
         <button
-          onClick={() => remove(item.productId)}
+          onClick={() => remove(item.productId, item.options)}
           className="text-coffee-mid hover:text-coffee-accent text-sm transition"
           aria-label={`Rimuovi ${product.name}`}
         >

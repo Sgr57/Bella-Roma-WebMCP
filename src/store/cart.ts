@@ -37,9 +37,11 @@ interface CartState {
     quantity: number,
     options?: CartItemOptions,
   ) => boolean;
-  removeItem: (productId: string) => boolean;
-  applyCoupon: (code: string) => boolean;
-  clearCoupon: () => void;
+  removeItem: (productId: string, options?: CartItemOptions) => boolean;
+  clearCart: () => void;
+  quantityFor: (productId: string, options?: CartItemOptions) => number;
+  applyCoupon: (code: string) => { ok: boolean; previous: string | null };
+  clearCoupon: () => boolean;
   checkout: () => { ok: boolean; total: number; reason?: string };
   reset: () => void;
   logToolCall: (tool: string, args: unknown, result: string) => void;
@@ -136,8 +138,21 @@ export const useCartStore = create<CartState>((set, get) => ({
     return true;
   },
 
-  removeItem: (productId) => {
-    const idx = get().items.findIndex((i) => i.productId === productId);
+  removeItem: (productId, options) => {
+    const items = get().items;
+    let idx: number;
+    if (options !== undefined) {
+      const norm = normalizeOptions({
+        ...defaultOptionsFor(productId),
+        ...options,
+      });
+      const key = optionsKey(norm);
+      idx = items.findIndex(
+        (i) => i.productId === productId && optionsKey(i.options) === key,
+      );
+    } else {
+      idx = items.findIndex((i) => i.productId === productId);
+    }
     if (idx < 0) return false;
     set((state) => ({
       items: state.items.filter((_, j) => j !== idx),
@@ -145,15 +160,40 @@ export const useCartStore = create<CartState>((set, get) => ({
     return true;
   },
 
+  clearCart: () => set({ items: [], coupon: null }),
+
+  quantityFor: (productId, options) => {
+    const items = get().items;
+    if (options !== undefined) {
+      const norm = normalizeOptions({
+        ...defaultOptionsFor(productId),
+        ...options,
+      });
+      const key = optionsKey(norm);
+      const found = items.find(
+        (i) => i.productId === productId && optionsKey(i.options) === key,
+      );
+      return found?.quantity ?? 0;
+    }
+    return items
+      .filter((i) => i.productId === productId)
+      .reduce((acc, i) => acc + i.quantity, 0);
+  },
+
   applyCoupon: (code) => {
     const normalized = code.toUpperCase();
     const discount = getCouponDiscount(normalized, get().subtotal());
-    if (discount === null) return false;
+    if (discount === null) return { ok: false, previous: get().coupon };
+    const previous = get().coupon;
     set({ coupon: normalized });
-    return true;
+    return { ok: true, previous: previous === normalized ? null : previous };
   },
 
-  clearCoupon: () => set({ coupon: null }),
+  clearCoupon: () => {
+    const had = get().coupon !== null;
+    set({ coupon: null });
+    return had;
+  },
 
   checkout: () => {
     const items = get().items;

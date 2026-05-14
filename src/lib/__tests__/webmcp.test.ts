@@ -18,8 +18,8 @@ describe("WebMCP tools", () => {
     fakeAgent.requestUserInteraction.mockClear();
   });
 
-  it("exposes exactly 7 tools", () => {
-    expect(buildTools()).toHaveLength(7);
+  it("exposes exactly 9 tools", () => {
+    expect(buildTools()).toHaveLength(9);
   });
 
   it("search_products returns all products when no filter", async () => {
@@ -282,14 +282,117 @@ describe("WebMCP tools", () => {
     expect(res.content[0].text.toLowerCase()).toContain("non offre");
   });
 
-  it("add_to_cart errors when product itself is unavailable", async () => {
+  it("add_to_cart rejects milk_option products as modifiers", async () => {
     const res = await findTool("add_to_cart").execute(
-      { product_id: "milk-soy", quantity: 1 },
+      { product_id: "milk-oat", quantity: 1 },
       fakeAgent,
     );
     expect(res.isError).toBe(true);
-    const t = res.content[0].text;
-    expect(t.toLowerCase()).toMatch(/esaurit[ao]/);
-    expect(t).toContain("milk-oat");
+    expect(res.content[0].text.toLowerCase()).toContain("modificatore");
+    expect(useCartStore.getState().items).toHaveLength(0);
+  });
+
+  it("add_to_cart rejects non-integer quantity", async () => {
+    const res = await findTool("add_to_cart").execute(
+      { product_id: "espresso", quantity: 2.5 },
+      fakeAgent,
+    );
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text.toLowerCase()).toContain("intero");
+    expect(useCartStore.getState().items).toHaveLength(0);
+  });
+
+  it("add_to_cart rejects string quantity", async () => {
+    const res = await findTool("add_to_cart").execute(
+      { product_id: "espresso", quantity: "due" },
+      fakeAgent,
+    );
+    expect(res.isError).toBe(true);
+    expect(useCartStore.getState().items).toHaveLength(0);
+  });
+
+  it("add_to_cart rejects quantity > 10", async () => {
+    const res = await findTool("add_to_cart").execute(
+      { product_id: "espresso", quantity: 11 },
+      fakeAgent,
+    );
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain("1-10");
+    expect(useCartStore.getState().items).toHaveLength(0);
+  });
+
+  it("add_to_cart rejects missing quantity", async () => {
+    const res = await findTool("add_to_cart").execute(
+      { product_id: "espresso" },
+      fakeAgent,
+    );
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain("quantity");
+    expect(useCartStore.getState().items).toHaveLength(0);
+  });
+
+  it("add_to_cart enforces cumulative max across calls", async () => {
+    const first = await findTool("add_to_cart").execute(
+      { product_id: "espresso", quantity: 6 },
+      fakeAgent,
+    );
+    expect(first.isError).toBeFalsy();
+    const second = await findTool("add_to_cart").execute(
+      { product_id: "espresso", quantity: 6 },
+      fakeAgent,
+    );
+    expect(second.isError).toBe(true);
+    expect(second.content[0].text).toContain("Limite");
+    expect(useCartStore.getState().items[0].quantity).toBe(6);
+  });
+
+  it("get_product is case-insensitive on product_id", async () => {
+    const res = await findTool("get_product").execute(
+      { product_id: "ESPRESSO" },
+      fakeAgent,
+    );
+    expect(res.isError).toBeFalsy();
+    expect(res.content[0].text).toContain("Espresso Classico");
+  });
+
+  it("remove_from_cart with options removes the specific line", async () => {
+    useCartStore.getState().addItem("cappuccino", 1, { milk: "milk-oat" });
+    useCartStore.getState().addItem("cappuccino", 1, { milk: "milk-almond" });
+    const res = await findTool("remove_from_cart").execute(
+      { product_id: "cappuccino", options: { milk: "milk-oat" } },
+      fakeAgent,
+    );
+    expect(res.isError).toBeFalsy();
+    const items = useCartStore.getState().items;
+    expect(items).toHaveLength(1);
+    expect(items[0].options?.milk).toBe("milk-almond");
+  });
+
+  it("apply_coupon reports the overwritten coupon", async () => {
+    useCartStore.getState().addItem("espresso", 2);
+    await findTool("apply_coupon").execute({ code: "BENVENUTO" }, fakeAgent);
+    const res = await findTool("apply_coupon").execute(
+      { code: "STUDENTI" },
+      fakeAgent,
+    );
+    expect(res.isError).toBeFalsy();
+    expect(res.content[0].text).toContain("sostituisce BENVENUTO");
+  });
+
+  it("clear_cart empties items and coupon", async () => {
+    useCartStore.getState().addItem("espresso", 2);
+    useCartStore.getState().applyCoupon("BENVENUTO");
+    const res = await findTool("clear_cart").execute({}, fakeAgent);
+    expect(res.isError).toBeFalsy();
+    expect(useCartStore.getState().items).toEqual([]);
+    expect(useCartStore.getState().coupon).toBeNull();
+  });
+
+  it("remove_coupon clears active coupon", async () => {
+    useCartStore.getState().addItem("espresso", 1);
+    useCartStore.getState().applyCoupon("BENVENUTO");
+    const res = await findTool("remove_coupon").execute({}, fakeAgent);
+    expect(res.isError).toBeFalsy();
+    expect(useCartStore.getState().coupon).toBeNull();
   });
 });

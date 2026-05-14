@@ -7,6 +7,40 @@ import {
 } from "./products";
 import { defaultOptionsFor, useCartStore } from "../store/cart";
 
+const MAX_LINE_QUANTITY = 10;
+
+function findProductCaseInsensitive(id: string) {
+  const direct = getProductById(id);
+  if (direct) return direct;
+  const needle = id.trim().toLowerCase();
+  if (!needle) return undefined;
+  return PRODUCTS.find((p) => p.id.toLowerCase() === needle);
+}
+
+function validateQuantity(
+  raw: unknown,
+): { ok: true; value: number } | { ok: false; message: string } {
+  if (raw === undefined || raw === null) {
+    return { ok: false, message: "Parametro 'quantity' obbligatorio (intero 1-10)." };
+  }
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return {
+      ok: false,
+      message: `Parametro 'quantity' deve essere un intero numerico (ricevuto: ${JSON.stringify(raw)}).`,
+    };
+  }
+  if (!Number.isInteger(raw)) {
+    return { ok: false, message: `Parametro 'quantity' deve essere intero (ricevuto ${raw}).` };
+  }
+  if (raw < 1 || raw > MAX_LINE_QUANTITY) {
+    return {
+      ok: false,
+      message: `Parametro 'quantity' fuori range: deve essere 1-${MAX_LINE_QUANTITY} (ricevuto ${raw}).`,
+    };
+  }
+  return { ok: true, value: raw };
+}
+
 export type ToolResult = {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
@@ -244,8 +278,13 @@ export function buildTools(): Tool[] {
         required: ["product_id"],
       },
       async execute(args) {
-        const { product_id } = args as { product_id: string };
-        const p = getProductById(product_id);
+        const a = args as { product_id?: unknown };
+        if (typeof a.product_id !== "string" || a.product_id.length === 0) {
+          useCartStore.getState().logToolCall("get_product", args, "errore: product_id mancante");
+          return err("Parametro 'product_id' obbligatorio (stringa non vuota).");
+        }
+        const product_id = a.product_id;
+        const p = findProductCaseInsensitive(product_id);
         if (!p) {
           useCartStore
             .getState()
@@ -357,22 +396,54 @@ export function buildTools(): Tool[] {
         required: ["product_id", "quantity"],
       },
       async execute(args) {
-        const { product_id, quantity, options } = args as {
-          product_id: string;
-          quantity: number;
+        const a = args as {
+          product_id?: unknown;
+          quantity?: unknown;
           options?: { size?: SizeOption; milk?: string; sweetness?: SweetnessOption };
         };
-        const product = getProductById(product_id);
+        if (typeof a.product_id !== "string" || a.product_id.length === 0) {
+          useCartStore
+            .getState()
+            .logToolCall("add_to_cart", args, "errore: product_id mancante");
+          return err("Parametro 'product_id' obbligatorio (stringa non vuota).");
+        }
+        const product_id = a.product_id;
+        const qCheck = validateQuantity(a.quantity);
+        if (!qCheck.ok) {
+          useCartStore.getState().logToolCall("add_to_cart", args, `errore: ${qCheck.message}`);
+          return err(qCheck.message);
+        }
+        const quantity = qCheck.value;
+        const options = a.options;
+        const product = findProductCaseInsensitive(product_id);
         if (!product) {
           useCartStore
             .getState()
             .logToolCall("add_to_cart", args, "errore: prodotto non trovato");
           return err(`Prodotto "${product_id}" non trovato.`);
         }
+        if (product.type === "milk_option") {
+          useCartStore
+            .getState()
+            .logToolCall("add_to_cart", args, "errore: milk_option non vendibile");
+          return err(
+            `"${product.name}" è un modificatore latte, non vendibile da solo. Usalo come options.milk su una bevanda.`,
+          );
+        }
         if (!product.available) {
           const altText = formatAlternatives(product.alternatives);
           const msg = `Prodotto "${product.name}" ESAURITO.${altText}`;
           useCartStore.getState().logToolCall("add_to_cart", args, "errore: esaurito");
+          return err(msg);
+        }
+        const existingQty = useCartStore
+          .getState()
+          .quantityFor(product.id, options);
+        if (existingQty + quantity > MAX_LINE_QUANTITY) {
+          const msg = `Limite di ${MAX_LINE_QUANTITY} per riga: ne hai già ${existingQty}, puoi aggiungerne al massimo ${MAX_LINE_QUANTITY - existingQty}.`;
+          useCartStore
+            .getState()
+            .logToolCall("add_to_cart", args, "errore: limite riga superato");
           return err(msg);
         }
         if (options?.size) {
@@ -419,40 +490,72 @@ export function buildTools(): Tool[] {
         }
         const okAdd = useCartStore
           .getState()
-          .addItem(product_id, quantity, options);
+          .addItem(product.id, quantity, options);
         if (!okAdd) {
           useCartStore
             .getState()
             .logToolCall("add_to_cart", args, "errore generico");
           return err(`Impossibile aggiungere "${product_id}".`);
         }
-        const effective = { ...defaultOptionsFor(product_id), ...options };
+        const effective = { ...defaultOptionsFor(product.id), ...options };
         const optsLabel = formatOptionsLabel(effective);
-        const msg = `Aggiunto: ${product.name} x${quantity}${optsLabel}.`;
+        const totalQty = useCartStore.getState().quantityFor(product.id, options);
+        const mergeNote =
+          existingQty > 0
+            ? ` (riga ora x${totalQty}, era x${existingQty})`
+            : "";
+        const msg = `Aggiunto: ${product.name} x${quantity}${optsLabel}${mergeNote}.`;
         useCartStore.getState().logToolCall("add_to_cart", args, msg);
         return ok(msg);
       },
     },
     {
       name: "remove_from_cart",
-      description: "Rimuove un prodotto dal carrello.",
+      description:
+        "Rimuove una riga dal carrello. Passa anche 'options' (size/milk/sweetness) se il carrello contiene più righe dello stesso prodotto con opzioni diverse, altrimenti viene rimossa la prima riga che combacia con il product_id.",
       inputSchema: {
         type: "object",
         properties: {
           product_id: { type: "string" },
+          options: {
+            type: "object",
+            description:
+              "Opzioni per disambiguare quale riga rimuovere (size/milk/sweetness).",
+            properties: {
+              size: { type: "string", enum: ["S", "M", "L"] },
+              milk: { type: "string" },
+              sweetness: { type: "string", enum: ["none", "low", "normal"] },
+            },
+          },
         },
         required: ["product_id"],
       },
       async execute(args) {
-        const { product_id } = args as { product_id: string };
-        const removed = useCartStore.getState().removeItem(product_id);
+        const a = args as {
+          product_id?: unknown;
+          options?: { size?: SizeOption; milk?: string; sweetness?: SweetnessOption };
+        };
+        if (typeof a.product_id !== "string" || a.product_id.length === 0) {
+          useCartStore
+            .getState()
+            .logToolCall("remove_from_cart", args, "errore: product_id mancante");
+          return err("Parametro 'product_id' obbligatorio (stringa non vuota).");
+        }
+        const product_id = a.product_id;
+        const product = findProductCaseInsensitive(product_id);
+        const canonicalId = product?.id ?? product_id;
+        const removed = useCartStore
+          .getState()
+          .removeItem(canonicalId, a.options);
         if (!removed) {
           useCartStore
             .getState()
             .logToolCall("remove_from_cart", args, "non era nel carrello");
           return err(`"${product_id}" non era nel carrello.`);
         }
-        const msg = `Rimosso "${product_id}" dal carrello.`;
+        const remaining = useCartStore.getState().quantityFor(canonicalId);
+        const tail = remaining > 0 ? ` Restano ${remaining} unità con opzioni diverse.` : "";
+        const msg = `Rimosso "${canonicalId}" dal carrello.${tail}`;
         useCartStore.getState().logToolCall("remove_from_cart", args, msg);
         return ok(msg);
       },
@@ -460,7 +563,7 @@ export function buildTools(): Tool[] {
     {
       name: "apply_coupon",
       description:
-        "Applica un codice sconto al carrello. Codici disponibili: BENVENUTO (10%), STUDENTI (20% max €5).",
+        "Applica un codice sconto al carrello. Codici disponibili: BENVENUTO (10%), STUDENTI (20% max €5). Se un coupon era già attivo viene sovrascritto e segnalato nel messaggio.",
       inputSchema: {
         type: "object",
         properties: {
@@ -469,15 +572,58 @@ export function buildTools(): Tool[] {
         required: ["code"],
       },
       async execute(args) {
-        const { code } = args as { code: string };
-        const okC = useCartStore.getState().applyCoupon(code);
-        if (!okC) {
+        const a = args as { code?: unknown };
+        if (typeof a.code !== "string" || a.code.trim().length === 0) {
+          useCartStore.getState().logToolCall("apply_coupon", args, "errore: code mancante");
+          return err("Parametro 'code' obbligatorio (stringa non vuota).");
+        }
+        const code = a.code;
+        const result = useCartStore.getState().applyCoupon(code);
+        if (!result.ok) {
           useCartStore.getState().logToolCall("apply_coupon", args, "non valido");
           const available = Object.keys(COUPONS).join(", ");
           return err(`Coupon "${code}" non valido. Disponibili: ${available}.`);
         }
-        const msg = `Coupon ${code.toUpperCase()} applicato.`;
+        const overwrite = result.previous
+          ? ` (sostituisce ${result.previous})`
+          : "";
+        const cartHint =
+          useCartStore.getState().items.length === 0
+            ? " Il carrello è vuoto: lo sconto sarà attivo al primo prodotto aggiunto."
+            : "";
+        const msg = `Coupon ${code.toUpperCase()} applicato${overwrite}.${cartHint}`;
         useCartStore.getState().logToolCall("apply_coupon", args, msg);
+        return ok(msg);
+      },
+    },
+    {
+      name: "remove_coupon",
+      description:
+        "Rimuove il coupon attualmente applicato al carrello. Non rimuove i prodotti.",
+      inputSchema: { type: "object", properties: {} },
+      async execute() {
+        const had = useCartStore.getState().clearCoupon();
+        const msg = had
+          ? "Coupon rimosso."
+          : "Nessun coupon era applicato.";
+        useCartStore.getState().logToolCall("remove_coupon", {}, msg);
+        return ok(msg);
+      },
+    },
+    {
+      name: "clear_cart",
+      description:
+        "Svuota completamente il carrello e rimuove il coupon. Usalo quando l'utente vuole ricominciare da zero.",
+      inputSchema: { type: "object", properties: {} },
+      async execute() {
+        const s = useCartStore.getState();
+        const hadItems = s.items.length;
+        const hadCoupon = s.coupon !== null;
+        s.clearCart();
+        const msg = hadItems === 0 && !hadCoupon
+          ? "Carrello già vuoto."
+          : `Carrello svuotato (${hadItems} righe rimosse${hadCoupon ? " + coupon rimosso" : ""}).`;
+        useCartStore.getState().logToolCall("clear_cart", {}, msg);
         return ok(msg);
       },
     },
