@@ -1,0 +1,1530 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Come implementare WebMCP — Manuale tecnico · Bella Roma Coffee</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* paper */
+    --paper:        #efe6d1;
+    --paper-soft:   #f3ecda;
+    --paper-deep:   #e3d6b6;
+    --paper-edge:   #c8b791;
+
+    /* ink */
+    --ink:          #0d1812;
+    --ink-soft:     #2c3a30;
+    --ink-mute:     #6b7c70;
+    --ink-faint:    #aea58b;
+
+    /* reply green */
+    --green:        #0d5a3d;
+    --green-deep:   #063524;
+    --green-darker: #042417;
+    --green-bright: #2da765;
+    --green-glow:   #7de8a8;
+    --green-soft:   #c4d8c7;
+    --green-tint:   rgba(13, 90, 61, 0.08);
+
+    /* accents */
+    --hot:          #c9482f;
+    --amber:        #c98a2a;
+    --blue:         #2563b8;
+    --violet:       #6b3fa8;
+
+    /* code */
+    --code-bg:      #061a13;
+    --code-fg:      #e8dfc6;
+    --code-mute:    #5a7065;
+    --code-key:     #f2b56c;
+    --code-str:     #7de8a8;
+    --code-fn:      #6fc6e0;
+    --code-com:     #4a6b58;
+    --code-num:     #d49ee0;
+
+    /* type */
+    --serif: "Instrument Serif", "Times New Roman", serif;
+    --sans:  "IBM Plex Sans", -apple-system, sans-serif;
+    --mono:  "IBM Plex Mono", ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; scroll-padding-top: 6vh; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* --- atmosphere --- */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background-image:
+      radial-gradient(rgba(13,24,18,.045) 1px, transparent 1px),
+      radial-gradient(rgba(13,24,18,.028) 1px, transparent 1.4px);
+    background-size: 3px 3px, 7px 7px;
+    background-position: 0 0, 1px 2px;
+    mix-blend-mode: multiply;
+  }
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background:
+      radial-gradient(60% 50% at 100% 0%, var(--green-tint), transparent 60%),
+      radial-gradient(40% 40% at 0% 100%, rgba(13,24,18,.05), transparent 60%);
+  }
+
+  /* === top chrome === */
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 28px;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .2em; text-transform: uppercase;
+    color: var(--ink-mute);
+    background: linear-gradient(180deg, var(--paper) 60%, rgba(239,230,209,0));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .topbar .mark { color: var(--ink); display: inline-flex; align-items: center; gap: 12px; }
+  .topbar .mark svg { display: block; }
+  .topbar .right { display: flex; gap: 1.6rem; align-items: center; }
+  .topbar a {
+    color: var(--ink-mute); text-decoration: none;
+    transition: color .15s;
+  }
+  .topbar a:hover { color: var(--green); }
+
+  .scrollbar {
+    position: fixed;
+    left: 0; right: 0; top: 0;
+    height: 2px;
+    z-index: 60;
+    background: linear-gradient(90deg, var(--green) var(--p, 0%), transparent var(--p, 0%));
+    transition: background .1s;
+  }
+
+  /* === LAYOUT === */
+  .shell {
+    display: grid;
+    grid-template-columns: 220px 1fr 240px;
+    gap: 0;
+    max-width: 1380px;
+    margin: 0 auto;
+    padding: 12vh 4vw 16vh;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* --- left rail: TOC --- */
+  aside.toc {
+    position: sticky; top: 12vh;
+    align-self: start;
+    height: max-content;
+    padding-right: 1.6rem;
+    border-right: 1px solid var(--ink-faint);
+  }
+  aside.toc .ribbon {
+    font-family: var(--mono); font-size: 10.5px;
+    letter-spacing: .26em; text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 1.2rem;
+    display: flex; align-items: center; gap: 8px;
+  }
+  aside.toc .ribbon::before {
+    content: ""; width: 6px; height: 6px; background: var(--green); border-radius: 50%;
+    box-shadow: 0 0 0 4px var(--green-soft);
+  }
+  aside.toc ol { list-style: none; counter-reset: c; }
+  aside.toc li {
+    counter-increment: c;
+    padding: 7px 0 7px 28px;
+    position: relative;
+    transition: padding-left .2s;
+  }
+  aside.toc li::before {
+    content: counter(c, upper-roman) ".";
+    position: absolute; left: 0;
+    font-family: var(--serif); font-style: italic;
+    color: var(--ink-mute);
+    font-size: 14px; line-height: 1.5;
+    transition: color .2s;
+  }
+  aside.toc a {
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.25;
+    display: block;
+    transition: color .2s;
+  }
+  aside.toc li:hover { padding-left: 32px; }
+  aside.toc li:hover::before { color: var(--green); }
+  aside.toc li:hover a { color: var(--green); }
+  aside.toc li.is-current::before { color: var(--green); }
+  aside.toc li.is-current a {
+    color: var(--green);
+    font-style: italic;
+  }
+  aside.toc .stamp {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--ink-faint);
+    font-family: var(--mono); font-size: 10px;
+    line-height: 1.7;
+    color: var(--ink-mute);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  aside.toc .stamp b { color: var(--ink); font-weight: 500; }
+
+  /* --- right rail: margin notes --- */
+  aside.marginalia {
+    align-self: start;
+    padding-left: 1.6rem;
+    padding-top: 0;
+    position: relative;
+  }
+  aside.marginalia .note {
+    position: sticky; top: 12vh;
+    font-family: var(--mono); font-size: 11.5px;
+    line-height: 1.7;
+    color: var(--ink-mute);
+    padding: 1.2rem 0;
+    border-top: 1px solid var(--ink-faint);
+    margin-bottom: 0;
+  }
+  aside.marginalia .note b {
+    font-family: var(--serif); font-style: italic; font-weight: 400;
+    color: var(--green);
+    font-size: 18px;
+    display: block;
+    margin-bottom: .4rem;
+    letter-spacing: -0.01em;
+  }
+
+  /* --- main column --- */
+  main.doc {
+    padding: 0 3.5vw;
+    min-width: 0;
+  }
+
+  /* === COVER / HEAD === */
+  .cover {
+    position: relative;
+    padding: 4vh 0 8vh;
+    border-bottom: 1px solid var(--ink-faint);
+    margin-bottom: 6vh;
+  }
+  .cover .meta {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--ink-mute);
+    display: flex; gap: 1.6rem; flex-wrap: wrap;
+    margin-bottom: 2.5rem;
+  }
+  .cover .meta span { display: inline-flex; align-items: center; gap: 7px; }
+  .cover .meta span::before {
+    content: ""; width: 5px; height: 5px; background: var(--green); border-radius: 50%;
+  }
+  .cover h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(56px, 9vw, 132px);
+    line-height: .9;
+    letter-spacing: -0.03em;
+    margin-bottom: 2.2rem;
+  }
+  .cover h1 em { font-style: italic; color: var(--green); }
+  .cover h1 .punct { color: var(--green-bright); }
+  .cover .subtitle {
+    font-family: var(--serif); font-style: italic;
+    font-size: clamp(22px, 2.4vw, 32px);
+    line-height: 1.32;
+    color: var(--ink-soft);
+    max-width: 36ch;
+  }
+  .cover .subtitle em { color: var(--green); font-style: italic; }
+  .cover .by {
+    margin-top: 3rem;
+    display: flex; gap: 2rem; flex-wrap: wrap;
+    align-items: baseline;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .18em; text-transform: uppercase;
+    color: var(--ink-mute);
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--ink-faint);
+  }
+  .cover .by b { color: var(--ink); font-weight: 500; }
+
+  /* === SECTION SCAFFOLDING === */
+  section.chapter {
+    padding: 4vh 0 6vh;
+    position: relative;
+    scroll-margin-top: 8vh;
+  }
+  section.chapter + section.chapter { border-top: 1px solid var(--ink-faint); }
+
+  .chapter-head {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 1.6rem;
+    align-items: baseline;
+    margin-bottom: 3.2rem;
+  }
+  .chapter-head .roman {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(80px, 9vw, 140px);
+    line-height: .82;
+    color: var(--green);
+    letter-spacing: -0.04em;
+    text-shadow: 0 0 80px rgba(13,90,61,.15);
+  }
+  .chapter-head .label {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .26em; text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: .8rem;
+  }
+  .chapter-head h2 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(36px, 5.4vw, 64px);
+    line-height: .96;
+    letter-spacing: -0.018em;
+    color: var(--ink);
+    max-width: 18ch;
+  }
+  .chapter-head h2 em { font-style: italic; color: var(--green); }
+
+  /* prose */
+  p.lede {
+    font-family: var(--serif); font-style: italic;
+    font-size: clamp(22px, 2.4vw, 30px);
+    line-height: 1.34;
+    color: var(--ink-soft);
+    margin-bottom: 2.4rem;
+    max-width: 34ch;
+  }
+  p.lede em { font-style: italic; color: var(--green); }
+  p.lede .non-italic { font-style: normal; }
+  p {
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--ink-soft);
+    margin-bottom: 1.2rem;
+    max-width: 64ch;
+  }
+  p strong, b.lift {
+    font-family: var(--serif); font-weight: 400; font-style: italic;
+    color: var(--ink);
+    font-size: 1.07em;
+    letter-spacing: -0.005em;
+  }
+  h3.section {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(26px, 3vw, 38px);
+    line-height: 1.05;
+    letter-spacing: -0.012em;
+    color: var(--ink);
+    margin: 3rem 0 1rem;
+  }
+  h3.section em { font-style: italic; color: var(--green); }
+  h3.section .num {
+    font-family: var(--mono); font-size: 12px;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--green);
+    margin-right: 1.2rem;
+    vertical-align: middle;
+  }
+
+  h4.subhead {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-top: 2rem;
+    margin-bottom: .9rem;
+    padding-top: .9rem;
+    border-top: 1px dashed var(--ink-faint);
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: .92em;
+    background: var(--green-tint);
+    color: var(--green-deep);
+    padding: 1px 6px;
+    border-radius: 2px;
+  }
+  p code, li code { font-size: .9em; }
+
+  ul.bullets, ol.numbered {
+    margin: 1rem 0 1.8rem;
+    padding-left: 0;
+  }
+  ul.bullets li, ol.numbered li {
+    list-style: none;
+    padding: .55rem 0 .55rem 1.8rem;
+    position: relative;
+    font-size: 15.5px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    border-bottom: 1px dashed var(--ink-faint);
+  }
+  ul.bullets li:last-child, ol.numbered li:last-child { border-bottom: 0; }
+  ul.bullets li::before {
+    content: "→";
+    position: absolute; left: 0;
+    color: var(--green);
+    font-family: var(--serif);
+    font-style: italic;
+  }
+  ol.numbered { counter-reset: n; }
+  ol.numbered li {
+    counter-increment: n;
+    padding-left: 3rem;
+  }
+  ol.numbered li::before {
+    content: counter(n, decimal-leading-zero);
+    position: absolute; left: 0;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .12em;
+    color: var(--green);
+    top: .8rem;
+  }
+  ol.numbered li b {
+    font-family: var(--serif); font-style: italic; font-weight: 400;
+    font-size: 19px;
+    color: var(--ink);
+    display: block;
+    margin-bottom: 4px;
+    letter-spacing: -0.005em;
+  }
+
+  /* === CODE BLOCKS === */
+  pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.75;
+    padding: 1.6rem 1.8rem 1.6rem 4rem;
+    border-radius: 3px;
+    overflow: auto;
+    position: relative;
+    margin: 1.6rem 0;
+    box-shadow:
+      8px 8px 0 var(--green),
+      0 30px 60px -30px rgba(6,53,36,.55);
+    border: 1px solid var(--green-deep);
+    counter-reset: ln;
+  }
+  pre::before {
+    content: attr(data-lang);
+    position: absolute;
+    top: 14px; right: 18px;
+    font-size: 10px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--code-mute);
+  }
+  pre::after {
+    content: "";
+    position: absolute;
+    top: 14px; left: 16px;
+    width: 8px; height: 8px;
+    background: var(--green-glow); border-radius: 50%;
+    box-shadow: 14px 0 0 #f2b56c, 28px 0 0 #c9482f;
+    opacity: .85;
+  }
+  pre .line {
+    display: block;
+    position: relative;
+    counter-increment: ln;
+  }
+  pre .line::before {
+    content: counter(ln, decimal-leading-zero);
+    position: absolute;
+    left: -3rem;
+    color: var(--code-mute);
+    font-size: 10.5px;
+    text-align: right;
+    width: 2rem;
+    opacity: .55;
+  }
+  pre .k { color: var(--code-key); }
+  pre .s { color: var(--code-str); }
+  pre .f { color: var(--code-fn); }
+  pre .c { color: var(--code-com); font-style: italic; }
+  pre .n { color: var(--code-fg); }
+  pre .p { color: var(--code-mute); }
+  pre .num { color: var(--code-num); }
+
+  /* small / inline code blocks */
+  pre.inline {
+    box-shadow: none;
+    border: 1px solid var(--ink-faint);
+    background: var(--paper-soft);
+    color: var(--ink);
+    padding: 1rem 1.2rem;
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+  pre.inline::before, pre.inline::after { display: none; }
+  pre.inline .k { color: var(--green); font-weight: 500; }
+  pre.inline .s { color: var(--hot); }
+  pre.inline .c { color: var(--ink-mute); }
+  pre.inline .f { color: var(--blue); }
+  pre.inline .n { color: var(--ink); }
+
+  /* === DIAGRAM === */
+  .diagram-wrap {
+    background: var(--paper-soft);
+    border: 1px solid var(--ink-faint);
+    padding: 2rem 2rem 1.2rem;
+    position: relative;
+    margin: 2rem 0;
+    box-shadow:
+      0 1px 0 var(--paper-edge),
+      8px 8px 0 var(--green-tint);
+  }
+  .diagram-wrap .diagram-title {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 1.4rem;
+    display: flex; justify-content: space-between;
+    border-bottom: 1px dashed var(--ink-faint);
+    padding-bottom: .8rem;
+  }
+  .diagram-wrap .diagram-title span:last-child { color: var(--ink-mute); }
+  .diagram-wrap svg { width: 100%; height: auto; display: block; }
+  .diagram-wrap .legend {
+    display: flex; gap: 1.8rem; flex-wrap: wrap;
+    margin-top: 1.2rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--ink-faint);
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .legend-dot {
+    display: inline-block; width: 10px; height: 10px;
+    border-radius: 50%; margin-right: 6px; vertical-align: middle;
+  }
+
+  /* === TOOL TABLE === */
+  table.tools {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.6rem 0 2rem;
+    font-size: 14.5px;
+  }
+  table.tools thead th {
+    text-align: left;
+    font-family: var(--mono); font-weight: 500; font-size: 10.5px;
+    letter-spacing: .18em; text-transform: uppercase;
+    color: var(--ink-mute);
+    padding: .6rem .8rem .8rem 0;
+    border-bottom: 2px solid var(--ink);
+  }
+  table.tools tbody td {
+    vertical-align: top;
+    padding: 1rem .8rem 1rem 0;
+    border-bottom: 1px solid var(--ink-faint);
+    color: var(--ink-soft);
+  }
+  table.tools tbody tr:hover td { background: var(--green-tint); }
+  table.tools td.name {
+    font-family: var(--mono); font-size: 13px;
+    color: var(--green-deep);
+    font-weight: 500;
+    width: 22%;
+  }
+  table.tools td.what { width: 58%; line-height: 1.55; font-size: 14px; }
+  table.tools td.conf {
+    width: 20%;
+    font-family: var(--serif); font-style: italic; font-size: 16px;
+    color: var(--ink-mute);
+  }
+  table.tools td.conf.yes { color: var(--hot); }
+  table.tools td.conf.yes::before {
+    content: "● "; color: var(--hot);
+  }
+  table.tools td.conf.no::before {
+    content: "○ "; color: var(--ink-faint);
+  }
+
+  /* === FILE MAP === */
+  .filemap {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.2rem;
+    margin: 2rem 0;
+  }
+  .file {
+    border: 1px solid var(--ink-faint);
+    padding: 1.2rem 1.2rem 1rem;
+    background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0));
+    position: relative;
+    transition: transform .2s, border-color .2s, box-shadow .2s;
+  }
+  .file:hover {
+    transform: translateY(-2px);
+    border-color: var(--green);
+    box-shadow: 0 12px 28px -16px rgba(13,90,61,.25);
+  }
+  .file .path {
+    font-family: var(--mono); font-size: 12px;
+    color: var(--green-deep);
+    font-weight: 500;
+    margin-bottom: .5rem;
+    word-break: break-word;
+  }
+  .file .role {
+    font-family: var(--mono); font-size: 9.5px;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-bottom: .8rem;
+  }
+  .file .desc {
+    font-size: 13.5px; line-height: 1.5;
+    color: var(--ink-soft);
+  }
+  .file .desc em { color: var(--green); font-style: italic; font-family: var(--serif); font-size: 1.15em; }
+  .file::after {
+    content: attr(data-loc);
+    position: absolute; top: 12px; right: 14px;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--ink-mute); letter-spacing: .14em;
+  }
+
+  /* === CALLOUTS === */
+  .callout {
+    border-left: 3px solid var(--green);
+    padding: 1.2rem 1.4rem;
+    background: var(--green-tint);
+    margin: 1.6rem 0;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 18px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 70ch;
+  }
+  .callout b {
+    font-family: var(--mono); font-size: 10.5px;
+    font-style: normal; font-weight: 500;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--green);
+    display: block;
+    margin-bottom: .5rem;
+  }
+
+  .callout.hot {
+    border-left-color: var(--hot);
+    background: rgba(201,72,47,.07);
+  }
+  .callout.hot b { color: var(--hot); }
+  .callout.amber {
+    border-left-color: var(--amber);
+    background: rgba(201,138,42,.08);
+  }
+  .callout.amber b { color: var(--amber); }
+
+  /* === DUAL CARDS for bridge comparison === */
+  .dual {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+    margin: 1.6rem 0;
+  }
+  .dual .panel {
+    padding: 1.6rem 1.6rem 1.4rem;
+    border: 1px solid var(--ink-faint);
+    background: linear-gradient(180deg, rgba(255,255,255,.4), transparent);
+    position: relative;
+    min-height: 280px;
+  }
+  .dual .panel .tag {
+    display: inline-block;
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: .18em; text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 999px;
+    margin-bottom: 1rem;
+  }
+  .dual .panel.native { border-color: var(--blue); background: rgba(37,99,184,.04); }
+  .dual .panel.native .tag { background: var(--blue); color: var(--paper); }
+  .dual .panel.polyfill { border-color: var(--violet); background: rgba(107,63,168,.05); }
+  .dual .panel.polyfill .tag { background: var(--violet); color: var(--paper); }
+  .dual .panel h5 {
+    font-family: var(--serif); font-weight: 400; font-style: italic;
+    font-size: 26px;
+    margin-bottom: .8rem;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    line-height: 1.05;
+  }
+  .dual .panel ul li {
+    list-style: none;
+    font-size: 13.5px;
+    padding: .4rem 0 .4rem 1.1rem;
+    position: relative;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    border-bottom: 1px dashed rgba(13,24,18,.1);
+  }
+  .dual .panel ul li::before {
+    content: "·";
+    position: absolute; left: 0;
+    color: var(--ink-mute);
+    font-size: 18px;
+    line-height: 1;
+  }
+  .dual .panel ul li:last-child { border-bottom: 0; }
+  .dual .panel ul li code { background: rgba(255,255,255,.5); }
+
+  /* === KEYVALUE STAT === */
+  .kv {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1.4rem;
+    margin: 1.8rem 0;
+  }
+  .kv .k {
+    padding-top: 1rem;
+    border-top: 2px solid var(--ink);
+    position: relative;
+  }
+  .kv .k::before {
+    content: ""; position: absolute; left: 0; top: -2px;
+    width: 28px; height: 2px; background: var(--green);
+  }
+  .kv .k .v {
+    font-family: var(--serif);
+    font-size: clamp(36px, 4vw, 56px);
+    line-height: .95;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .kv .k .v em { font-style: italic; color: var(--green); }
+  .kv .k .label {
+    font-family: var(--mono); font-size: 10.5px;
+    letter-spacing: .2em; text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-top: .5rem;
+  }
+
+  /* === BANNER / FINAL === */
+  .closing {
+    background: var(--green-deep);
+    color: var(--paper);
+    padding: 5vh 4vw;
+    margin: 8vh -4vw 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .closing::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(80% 60% at 30% 30%, rgba(125,232,168,.16), transparent 60%),
+      radial-gradient(60% 50% at 80% 90%, rgba(45,167,101,.25), transparent 60%);
+  }
+  .closing > * { position: relative; z-index: 1; }
+  .closing h2 {
+    font-family: var(--serif); font-style: italic; font-weight: 400;
+    font-size: clamp(40px, 6vw, 80px);
+    line-height: .95;
+    letter-spacing: -0.022em;
+    color: var(--paper);
+    margin-bottom: 2rem;
+    max-width: 18ch;
+  }
+  .closing h2 em { color: var(--green-glow); }
+  .closing .pillrow {
+    display: flex; gap: .6rem; flex-wrap: wrap;
+    margin-top: 1.4rem;
+  }
+  .closing a, .closing .pill {
+    font-family: var(--mono); font-size: 11.5px;
+    letter-spacing: .18em; text-transform: uppercase;
+    color: var(--paper);
+    border: 1px solid rgba(239,230,209,.4);
+    padding: 9px 14px;
+    border-radius: 999px;
+    text-decoration: none;
+    transition: background .2s, color .2s, border-color .2s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .closing a:hover {
+    background: var(--green-glow); color: var(--green-deep); border-color: var(--green-glow);
+  }
+
+  /* === step strip === */
+  .steps-strip {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0;
+    margin: 1.4rem 0 2.2rem;
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+  }
+  .steps-strip .step {
+    padding: 1rem .9rem;
+    border-right: 1px solid var(--ink-faint);
+    position: relative;
+  }
+  .steps-strip .step:last-child { border-right: 0; }
+  .steps-strip .step .n {
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: .22em; color: var(--green);
+  }
+  .steps-strip .step .t {
+    font-family: var(--serif); font-style: italic;
+    font-size: 18px; line-height: 1.1;
+    color: var(--ink);
+    margin-top: .4rem;
+    letter-spacing: -0.005em;
+  }
+
+  /* signature / divider */
+  .signature {
+    margin: 3rem 0;
+    display: flex; align-items: center; gap: 1rem;
+    font-family: var(--mono); font-size: 10.5px;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .signature::before, .signature::after {
+    content: ""; flex: 1; height: 1px;
+    background: var(--ink-faint);
+  }
+  .signature .glyph {
+    font-family: var(--serif); font-style: italic;
+    font-size: 22px; color: var(--green);
+  }
+
+  /* === RESPONSIVE === */
+  @media (max-width: 1140px) {
+    .shell {
+      grid-template-columns: 200px 1fr;
+      padding: 12vh 3vw 12vh;
+    }
+    aside.marginalia { display: none; }
+  }
+  @media (max-width: 760px) {
+    .shell {
+      grid-template-columns: 1fr;
+      padding: 14vh 5vw 10vh;
+    }
+    aside.toc {
+      position: static;
+      border-right: 0;
+      border-bottom: 1px solid var(--ink-faint);
+      padding-right: 0;
+      padding-bottom: 2rem;
+      margin-bottom: 3rem;
+    }
+    aside.marginalia { display: none; }
+    .chapter-head { grid-template-columns: 64px 1fr; gap: 1rem; }
+    .dual { grid-template-columns: 1fr; }
+    .steps-strip { grid-template-columns: repeat(2, 1fr); }
+    .topbar .right { display: none; }
+  }
+
+  @media print {
+    @page { size: A4; margin: 18mm; }
+    body { background: white; }
+    body::before, body::after { display: none; }
+    .topbar, .scrollbar, aside.toc, aside.marginalia { display: none; }
+    .shell { grid-template-columns: 1fr; padding: 0; max-width: none; }
+    main.doc { padding: 0; }
+    pre { box-shadow: none; page-break-inside: avoid; }
+    .chapter-head, .dual, .filemap { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- progress bar -->
+<div class="scrollbar" id="scrollbar" style="--p:0%"></div>
+
+<!-- topbar -->
+<header class="topbar">
+  <span class="mark">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path d="M2 12 Q 2 2 12 2 L 12 5 Q 5 5 5 12 Z" fill="currentColor"/>
+    </svg>
+    Manuale &middot; WebMCP / Bella Roma Coffee
+  </span>
+  <span class="right">
+    <a href="presentazione.html">↩ Presentazione</a>
+    <a href="https://localhost:5173" target="_blank" rel="noopener">Demo live ↗</a>
+    <a href="#chapter-1">Inizio</a>
+  </span>
+</header>
+
+<div class="shell">
+
+  <!-- ============ LEFT RAIL : TOC ============ -->
+  <aside class="toc">
+    <div class="ribbon">Indice</div>
+    <ol>
+      <li><a href="#chapter-1">Architettura in <em>una pagina</em></a></li>
+      <li><a href="#chapter-2">La <em>tool surface</em></a></li>
+      <li><a href="#chapter-3">Setup ambiente</a></li>
+      <li><a href="#chapter-4">Detection &amp; polyfill</a></li>
+      <li><a href="#chapter-5">L'<em>adapter</em> tool→store</a></li>
+      <li><a href="#chapter-6">Bridge native a Claude</a></li>
+      <li><a href="#chapter-7">Mediazione utente</a></li>
+      <li><a href="#chapter-8">Verifica end-to-end</a></li>
+      <li><a href="#chapter-9">Mappa dei file</a></li>
+      <li><a href="#chapter-10">Adattare a un sito proprio</a></li>
+    </ol>
+    <div class="stamp">
+      <b>Manuale tecnico</b><br/>
+      v1.0 · Maggio 2026<br/>
+      <br/>
+      Bella Roma Coffee<br/>
+      Demo WebMCP &middot; Reply
+    </div>
+  </aside>
+
+  <!-- ============ MAIN COLUMN ============ -->
+  <main class="doc">
+
+    <!-- ===== COVER ===== -->
+    <section class="cover">
+      <div class="meta">
+        <span>Manuale tecnico</span>
+        <span>Maggio 2026</span>
+        <span>v1.0 · Reply</span>
+        <span>Audience: dev &amp; tech lead</span>
+      </div>
+      <h1>
+        Come <em>implementare</em><br/>
+        WebMCP <em>davvero</em><span class="punct">.</span>
+      </h1>
+      <p class="subtitle">
+        Anatomia della demo <em>Bella Roma Coffee</em>: come abbiamo reso un sito React invocabile da Claude in <em>165 righe di codice</em> client, senza estensione, su browser nativo e su browser stable.
+      </p>
+      <div class="by">
+        <span>Stack <b>React 18 · Vite 6 · Zustand · TypeScript 5</b></span>
+        <span>API <b>navigator.modelContext</b> + relay locale</span>
+        <span>Tempo di lettura <b>~14 minuti</b></span>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         CHAPTER 1 — ARCHITETTURA IN UNA PAGINA
+    ========================================================== -->
+    <section class="chapter" id="chapter-1" data-chapter="1">
+      <div class="chapter-head">
+        <div class="roman">I</div>
+        <div>
+          <div class="label">Capitolo I · Vista d'insieme</div>
+          <h2>L'<em>architettura</em>,<br/>in una pagina.</h2>
+        </div>
+      </div>
+
+      <p class="lede">Un sito React esistente, sei tool registrati con <em>navigator.modelContext</em>, due bridge intercambiabili verso Claude Desktop, un unico modale di conferma per le azioni distruttive. Tutto in-page, nessuna estensione.</p>
+
+      <p>La demo Bella Roma è un coffee shop fittizio: catalogo, carrello, coupon, checkout. Le sei funzioni — <code>search_products</code>, <code>add_to_cart</code>, <code>remove_from_cart</code>, <code>apply_coupon</code>, <code>get_cart</code>, <code>checkout</code> — sono <b class="lift">la stessa identica logica</b> che usa l'utente cliccando i bottoni. WebMCP è solo un guscio sopra lo store Zustand.</p>
+
+      <p>Il problema non è "esporre le funzioni" — è <b class="lift">esporle ovunque</b>: su Chrome Canary che ha la spec nativa, e su Chrome stable che non ce l'ha. Abbiamo scritto un piccolo orchestratore di 80 righe che rileva il browser e instrada al bridge giusto, senza far cambiare nulla all'utente.</p>
+
+      <h3 class="section"><span class="num">§ 1.1</span> I <em>due bridge</em></h3>
+
+      <div class="dual">
+        <div class="panel native">
+          <span class="tag">Native · Chrome 146 Canary</span>
+          <h5>relay-client.ts</h5>
+          <p style="font-size:14px;color:var(--ink-soft);margin-bottom:1rem">La pagina apre un WebSocket direttamente verso <code>127.0.0.1:9333</code>, parla il protocollo del relay, dispatcha le invoke localmente.</p>
+          <ul>
+            <li>Usa <code>navigator.modelContext.registerTool</code> (W3C spec)</li>
+            <li>165 LoC client · nessuna dipendenza extra</li>
+            <li>Reconnect con backoff 2s → 30s</li>
+            <li>Indicatore "nativo (Canary)" 🟢 + "native WS (open)" 🔵</li>
+          </ul>
+        </div>
+        <div class="panel polyfill">
+          <span class="tag">Polyfill · Chrome stable / qualsiasi</span>
+          <h5>embed CDN</h5>
+          <p style="font-size:14px;color:var(--ink-soft);margin-bottom:1rem">Il polyfill <code>@mcp-b/global</code> installa <code>navigator.modelContext</code>; l'embed <code>@mcp-b/webmcp-local-relay</code> da CDN inietta un iframe che apre il WebSocket per noi.</p>
+          <ul>
+            <li>Usa <code>provideContext({tools})</code> (API polyfill)</li>
+            <li>Solo 1 import npm + 1 <code>&lt;script&gt;</code> CDN</li>
+            <li>Nessuna estensione browser richiesta</li>
+            <li>Indicatore "Polyfill MCP-B" 🟡 + "embed CDN" 🟣</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="diagram-wrap">
+        <div class="diagram-title">
+          <span>Fig. 1 — Routing dei bridge</span>
+          <span>src/lib/relay.ts · connectRelay(mode)</span>
+        </div>
+        <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#0d1812"/>
+            </marker>
+            <marker id="arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#0d5a3d"/>
+            </marker>
+            <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="6" stroke="#0d5a3d" stroke-opacity=".15" stroke-width="1"/>
+            </pattern>
+          </defs>
+
+          <!-- Claude Desktop -->
+          <g>
+            <rect x="350" y="20" width="200" height="60" rx="2" fill="#0d5a3d"/>
+            <text x="450" y="48" text-anchor="middle" font-family="Instrument Serif, serif" font-style="italic" font-size="22" fill="#efe6d1">Claude Desktop</text>
+            <text x="450" y="65" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" letter-spacing="2" fill="#7de8a8" text-transform="uppercase">CLIENT MCP STDIO</text>
+          </g>
+
+          <!-- stdio arrow -->
+          <line x1="450" y1="80" x2="450" y2="130" stroke="#0d1812" stroke-width="1.5" marker-end="url(#arr)" />
+          <text x="465" y="108" font-family="IBM Plex Mono" font-size="10" fill="#6b7c70">stdio MCP</text>
+
+          <!-- relay -->
+          <g>
+            <rect x="320" y="130" width="260" height="56" fill="none" stroke="#0d1812" stroke-width="1.5"/>
+            <rect x="320" y="130" width="260" height="56" fill="url(#hatch)"/>
+            <text x="450" y="156" text-anchor="middle" font-family="Instrument Serif, serif" font-style="italic" font-size="20" fill="#0d1812">webmcp-local-relay</text>
+            <text x="450" y="174" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#6b7c70" letter-spacing="1.5">avviato da Claude · 127.0.0.1:9333</text>
+          </g>
+
+          <!-- WS branches -->
+          <path d="M 380 186 Q 380 220 200 230" fill="none" stroke="#2563b8" stroke-width="1.6" stroke-dasharray="0" marker-end="url(#arr)"/>
+          <path d="M 520 186 Q 520 220 720 230" fill="none" stroke="#6b3fa8" stroke-width="1.6" marker-end="url(#arr)"/>
+          <text x="270" y="215" font-family="IBM Plex Mono" font-size="9.5" fill="#2563b8" letter-spacing="1.2">WS · 9333</text>
+          <text x="600" y="215" font-family="IBM Plex Mono" font-size="9.5" fill="#6b3fa8" letter-spacing="1.2">WS · iframe</text>
+
+          <!-- left: native -->
+          <g>
+            <rect x="60" y="230" width="290" height="110" fill="rgba(37,99,184,.06)" stroke="#2563b8" stroke-width="1.5" rx="2"/>
+            <text x="80" y="252" font-family="IBM Plex Mono" font-size="9.5" letter-spacing="1.6" fill="#2563b8">CHROME 146 CANARY · NATIVE</text>
+            <text x="80" y="278" font-family="Instrument Serif, serif" font-style="italic" font-size="22" fill="#0d1812">navigator.modelContext</text>
+            <text x="80" y="298" font-family="IBM Plex Mono" font-size="10.5" fill="#2c3a30">registerTool(t) ×6</text>
+            <text x="80" y="316" font-family="IBM Plex Mono" font-size="10.5" fill="#2c3a30">+ src/lib/relay-client.ts</text>
+            <text x="80" y="332" font-family="IBM Plex Mono" font-size="10.5" fill="#6b7c70">hello · tools/list · invoke · pong</text>
+          </g>
+
+          <!-- right: polyfill -->
+          <g>
+            <rect x="560" y="230" width="290" height="110" fill="rgba(107,63,168,.06)" stroke="#6b3fa8" stroke-width="1.5" rx="2"/>
+            <text x="580" y="252" font-family="IBM Plex Mono" font-size="9.5" letter-spacing="1.6" fill="#6b3fa8">CHROME STABLE · POLYFILL</text>
+            <text x="580" y="278" font-family="Instrument Serif, serif" font-style="italic" font-size="22" fill="#0d1812">@mcp-b/global</text>
+            <text x="580" y="298" font-family="IBM Plex Mono" font-size="10.5" fill="#2c3a30">provideContext({tools})</text>
+            <text x="580" y="316" font-family="IBM Plex Mono" font-size="10.5" fill="#2c3a30">+ embed.js (CDN jsDelivr)</text>
+            <text x="580" y="332" font-family="IBM Plex Mono" font-size="10.5" fill="#6b7c70">inietta iframe hidden</text>
+          </g>
+        </svg>
+        <div class="legend">
+          <span><span class="legend-dot" style="background:#2563b8"></span>Path native</span>
+          <span><span class="legend-dot" style="background:#6b3fa8"></span>Path polyfill</span>
+          <span><span class="legend-dot" style="background:url(#hatch);background-color:#0d5a3d"></span>Componente di sistema (binario npm)</span>
+        </div>
+      </div>
+
+      <div class="callout">
+        <b>Punto chiave</b>
+        Lo stesso sito gira su due path completamente diversi senza che l'utente lo sappia. La detection è in <code>src/lib/polyfill.ts</code> &mdash; legge <code>constructor.name</code> per distinguere <em>ModelContext</em> (nativo) da <em>BrowserMcpServer</em> (polyfill), perché il solo <code>'modelContext' in navigator</code> non basta: alcuni setup caricano il polyfill come side-effect anche su Canary.
+      </div>
+
+      <h3 class="section"><span class="num">§ 1.2</span> Cosa abbiamo <em>scritto</em>, cosa abbiamo <em>preso</em></h3>
+
+      <div class="kv">
+        <div class="k">
+          <div class="v"><em>~165</em></div>
+          <div class="label">LoC custom · relay-client.ts</div>
+        </div>
+        <div class="k">
+          <div class="v"><em>6</em></div>
+          <div class="label">tool WebMCP esposti</div>
+        </div>
+        <div class="k">
+          <div class="v"><em>1</em></div>
+          <div class="label">dipendenza npm aggiuntiva (@mcp-b/global)</div>
+        </div>
+        <div class="k">
+          <div class="v"><em>0</em></div>
+          <div class="label">estensioni browser necessarie</div>
+        </div>
+      </div>
+
+      <p>Il polyfill <code>@mcp-b/global</code> e l'embed <code>@mcp-b/webmcp-local-relay</code> sono dell'ecosistema MCP-B / WebMCP-org. Tutto il resto — adapter store, dispatch, indicatori, routing dei bridge, modale di conferma — è codice nostro, leggibile in mezza giornata.</p>
+
+    </section>
+
+    <!-- =========================================================
+         CHAPTER 2 — LA TOOL SURFACE
+    ========================================================== -->
+    <section class="chapter" id="chapter-2" data-chapter="2">
+      <div class="chapter-head">
+        <div class="roman">II</div>
+        <div>
+          <div class="label">Capitolo II · La tool surface</div>
+          <h2>Sei tool. <em>Granularità intent</em>, non click.</h2>
+        </div>
+      </div>
+
+      <p class="lede">Una buona tool surface non rispecchia i bottoni della UI: rispecchia il <em>linguaggio</em> con cui l'utente esprime cosa vuole fare.</p>
+
+      <p>Le sei firme sotto coprono per intero il flusso del coffee shop: scoperta del catalogo, manipolazione del carrello, applicazione coupon, lettura stato, conferma ordine. <b class="lift">Niente "click_button"</b>, niente "fill_input": l'agente parla in operazioni di business, non in eventi DOM.</p>
+
+      <table class="tools">
+        <thead>
+          <tr>
+            <th>Tool</th>
+            <th>Cosa fa</th>
+            <th>Conferma utente</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="name">search_products</td>
+            <td class="what">Filtra il catalogo per <code>category</code> (<code>espresso</code>, <code>filtro</code>, <code>decaf</code>, <code>latte</code>), <code>max_price</code>, o testo libero. Solo lettura, idempotente.</td>
+            <td class="conf no">no</td>
+          </tr>
+          <tr>
+            <td class="name">add_to_cart</td>
+            <td class="what">Aggiunge <code>product_id</code> in <code>quantity</code> (1–10). Reversibile via <code>remove_from_cart</code>. JSON Schema con <code>required: ["product_id","quantity"]</code>.</td>
+            <td class="conf no">no</td>
+          </tr>
+          <tr>
+            <td class="name">remove_from_cart</td>
+            <td class="what">Rimuove una riga. Risponde con errore se l'item non era presente.</td>
+            <td class="conf no">no</td>
+          </tr>
+          <tr>
+            <td class="name">apply_coupon</td>
+            <td class="what">Applica <code>BENVENUTO</code> (-10%) o <code>STUDENTI</code> (-20% max €5). Lo store ricalcola subtotale, sconto, totale.</td>
+            <td class="conf no">no</td>
+          </tr>
+          <tr>
+            <td class="name">get_cart</td>
+            <td class="what">Ritorna stato corrente: items, subtotale, sconto applicato, totale. Read-only.</td>
+            <td class="conf no">no</td>
+          </tr>
+          <tr>
+            <td class="name">checkout</td>
+            <td class="what">Conferma l'ordine, svuota il carrello. <em>Side-effect non reversibile</em>: passa attraverso <code>requestUserInteraction</code> che apre il modale React.</td>
+            <td class="conf yes">sì</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="section"><span class="num">§ 2.1</span> Forma di un tool — il <em>contratto</em></h3>
+
+      <p>Ogni tool è un oggetto con quattro campi: <code>name</code>, <code>description</code>, <code>inputSchema</code> (JSON Schema), e una funzione <code>execute</code>. Il secondo argomento di <code>execute</code> è l'<code>agent</code>, che espone <code>requestUserInteraction</code>.</p>
+
+<pre data-lang="typescript · src/lib/webmcp.ts"><span class="line"><span class="k">export type</span> <span class="n">Tool</span> = {</span><span class="line">  <span class="n">name</span>: <span class="k">string</span>;</span><span class="line">  <span class="n">description</span>: <span class="k">string</span>;</span><span class="line">  <span class="n">inputSchema</span>: <span class="n">Record</span>&lt;<span class="k">string</span>, <span class="k">unknown</span>&gt;;</span><span class="line">  <span class="n">execute</span>: (<span class="n">args</span>: <span class="n">Record</span>&lt;<span class="k">string</span>, <span class="k">unknown</span>&gt;, <span class="n">agent</span>?: <span class="n">Agent</span>) =&gt; <span class="n">Promise</span>&lt;<span class="n">ToolResult</span>&gt;;</span><span class="line">};</span><span class="line"> </span><span class="line"><span class="c">// add_to_cart — un esempio reale</span></span><span class="line">{</span><span class="line">  <span class="n">name</span>: <span class="s">"add_to_cart"</span>,</span><span class="line">  <span class="n">description</span>: <span class="s">"Aggiunge un prodotto al carrello in una certa quantità."</span>,</span><span class="line">  <span class="n">inputSchema</span>: {</span><span class="line">    <span class="n">type</span>: <span class="s">"object"</span>,</span><span class="line">    <span class="n">properties</span>: {</span><span class="line">      <span class="n">product_id</span>: { <span class="n">type</span>: <span class="s">"string"</span>, <span class="n">description</span>: <span class="s">"L'id del prodotto"</span> },</span><span class="line">      <span class="n">quantity</span>:   { <span class="n">type</span>: <span class="s">"integer"</span>, <span class="n">minimum</span>: <span class="num">1</span>, <span class="n">maximum</span>: <span class="num">10</span> },</span><span class="line">    },</span><span class="line">    <span class="n">required</span>: [<span class="s">"product_id"</span>, <span class="s">"quantity"</span>],</span><span class="line">  },</span><span class="line">  <span class="k">async</span> <span class="f">execute</span>(args) {</span><span class="line">    <span class="k">const</span> { product_id, quantity } = args <span class="k">as</span> { <span class="n">product_id</span>: <span class="k">string</span>; <span class="n">quantity</span>: <span class="k">number</span> };</span><span class="line">    <span class="k">const</span> <span class="n">ok</span> = <span class="n">useCartStore</span>.<span class="f">getState</span>().<span class="f">addItem</span>(product_id, quantity);</span><span class="line">    <span class="k">if</span> (!ok) <span class="k">return</span> <span class="f">err</span>(<span class="s">`Prodotto "${product_id}" non trovato.`</span>);</span><span class="line">    <span class="k">const</span> msg = <span class="s">`Aggiunto: ${</span><span class="f">formatProduct</span><span class="s">(product_id, quantity)}.`</span>;</span><span class="line">    <span class="n">useCartStore</span>.<span class="f">getState</span>().<span class="f">logToolCall</span>(<span class="s">"add_to_cart"</span>, args, msg);</span><span class="line">    <span class="k">return</span> <span class="f">ok</span>(msg);</span><span class="line">  },</span><span class="line">}</span></pre>
+
+      <h4 class="subhead">Tre regole che hanno guidato il design</h4>
+      <ul class="bullets">
+        <li><b>Nomi verbo-oggetto.</b> <code>add_to_cart</code>, non <code>cart_add</code>. L'agente li interpreta come azioni, non come endpoint.</li>
+        <li><b>Schema stretto.</b> <code>enum</code> sulle categorie, <code>minimum/maximum</code> sulle quantità. Errori prima dell'esecuzione, meno round-trip col modello.</li>
+        <li><b>Output testuale ricco.</b> <code>"Aggiunto: Espresso x2 (€4.00)."</code> — l'agente riusa il testo per parlare con l'utente senza dover interpretare strutture.</li>
+      </ul>
+
+    </section>
+
+    <!-- =========================================================
+         CHAPTER 3 — SETUP AMBIENTE
+    ========================================================== -->
+    <section class="chapter" id="chapter-3" data-chapter="3">
+      <div class="chapter-head">
+        <div class="roman">III</div>
+        <div>
+          <div class="label">Capitolo III · Setup</div>
+          <h2>Ambiente, in <em>cinque minuti</em>.</h2>
+        </div>
+      </div>
+
+      <p>Tre cose: il sito React, Claude Desktop con il relay locale come server MCP, e (opzionalmente) Chrome 146 Canary col flag EPP per il path nativo. La presenza simultanea non serve — uno dei due basta.</p>
+
+      <h3 class="section"><span class="num">§ 3.1</span> Sito React</h3>
+
+<pre class="inline" data-lang="bash"><span class="c"># dalla root del repo</span>
+<span class="k">npm</span> install
+<span class="k">npm</span> run dev    <span class="c"># http://localhost:5173</span></pre>
+
+      <p>Il dev server di Vite serve il sito sulla 5173. Aprilo: vedrai i prodotti e il carrello. Senza fare altro, sei già a metà strada — il polyfill <code>@mcp-b/global</code> è una dipendenza npm ed espone <code>navigator.modelContext</code> nella pagina al primo import.</p>
+
+      <h3 class="section"><span class="num">§ 3.2</span> Claude Desktop + relay locale</h3>
+
+      <p>Apri (o crea) la config di Claude Desktop. Su macOS: <code>~/Library/Application Support/Claude/claude_desktop_config.json</code>. Aggiungi il relay come MCP server stdio:</p>
+
+<pre data-lang="json · claude_desktop_config.json"><span class="line">{</span><span class="line">  <span class="n">"mcpServers"</span>: {</span><span class="line">    <span class="n">"webmcp-local-relay"</span>: {</span><span class="line">      <span class="n">"command"</span>: <span class="s">"npx"</span>,</span><span class="line">      <span class="n">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"@mcp-b/webmcp-local-relay@latest"</span>]</span><span class="line">    }</span><span class="line">  }</span><span class="line">}</span></pre>
+
+      <p>Riavvia Claude Desktop <em>completamente</em>: <code>⌘Q</code> e riapri. Chiudere la finestra non basta. Il relay viene lanciato da Claude come child process via stdio, e in autonomia apre un WebSocket server su <code>127.0.0.1:9333</code> per le tab del browser.</p>
+
+      <div class="callout amber">
+        <b>Verifica</b>
+        <code>lsof -nP -i :9333</code> &mdash; devi vedere una riga <em>node &middot; LISTEN</em>. Quando una tab si connette, vedrai anche <em>Google &middot; ESTABLISHED</em>. Se manca il LISTEN, Claude non ha picked up la config: ricontrolla il path e riavvia.
+      </div>
+
+      <h3 class="section"><span class="num">§ 3.3</span> Apri la demo</h3>
+
+<pre class="inline" data-lang="url">http://localhost:5173/?relay=true</pre>
+
+      <p>Il query param <code>?relay=true</code> attiva il bridge. In header due indicatori:</p>
+      <ul class="bullets">
+        <li><b>Connessione</b> &mdash; 🟢 nativo (Canary) · 🟡 polyfill MCP-B · ⚪ nessun agente</li>
+        <li><b>Bridge</b> &mdash; 🔵 native WS open · 🟣 embed CDN · 🟠 connecting · 🔴 error · ▫ off</li>
+      </ul>
+      <p>Su Canary EPP vedrai 🟢 + 🔵. Su Chrome stable vedrai 🟡 + 🟣. Funziona uguale.</p>
+
+    </section>
+
+    <!-- =========================================================
+         CHAPTER 4 — DETECTION & POLYFILL
+    ========================================================== -->
+    <section class="chapter" id="chapter-4" data-chapter="4">
+      <div class="chapter-head">
+        <div class="roman">IV</div>
+        <div>
+          <div class="label">Capitolo IV · Detection</div>
+          <h2>Capire <em>chi</em> abbiamo<br/>davanti.</h2>
+        </div>
+      </div>
+
+      <p>Prima di registrare i tool dobbiamo sapere se il browser è nativo (Canary EPP) o se ci serve il polyfill. La detection è in 20 righe, ma c'è una sottigliezza: <b class="lift">il solo <code>'modelContext' in navigator</code> non basta</b>. Alcuni setup caricano il polyfill come side-effect anche dove la nativa esiste; per distinguere usiamo <code>constructor.name</code>.</p>
+
+<pre data-lang="typescript · src/lib/polyfill.ts"><span class="line"><span class="k">export type</span> <span class="n">WebMCPMode</span> = <span class="s">"native"</span> | <span class="s">"polyfill"</span> | <span class="s">"unavailable"</span>;</span><span class="line"> </span><span class="line"><span class="k">function</span> <span class="f">detectKind</span>(mc: <span class="k">object</span>): <span class="s">"native"</span> | <span class="s">"polyfill"</span> {</span><span class="line">  <span class="c">// Native Chrome: constructor.name === "ModelContext"</span></span><span class="line">  <span class="c">// Polyfill MCP-B: "BrowserMcpServer" + espone provideContext/callTool.</span></span><span class="line">  <span class="k">if</span> (mc.constructor?.name === <span class="s">"ModelContext"</span>) <span class="k">return</span> <span class="s">"native"</span>;</span><span class="line">  <span class="k">if</span> (<span class="s">"provideContext"</span> <span class="k">in</span> mc || <span class="s">"callTool"</span> <span class="k">in</span> mc) <span class="k">return</span> <span class="s">"polyfill"</span>;</span><span class="line">  <span class="k">return</span> <span class="s">"native"</span>;</span><span class="line">}</span><span class="line"> </span><span class="line"><span class="k">export async function</span> <span class="f">ensureWebMCP</span>(): <span class="n">Promise</span>&lt;<span class="n">WebMCPMode</span>&gt; {</span><span class="line">  <span class="k">if</span> (<span class="k">typeof</span> window === <span class="s">"undefined"</span>) <span class="k">return</span> <span class="s">"unavailable"</span>;</span><span class="line">  <span class="k">const</span> existing = window.navigator.modelContext;</span><span class="line">  <span class="k">if</span> (existing) <span class="k">return</span> <span class="f">detectKind</span>(existing);</span><span class="line">  <span class="c">// Nativo non c'è: importa il polyfill (dynamic import, no overhead se non serve).</span></span><span class="line">  <span class="k">try</span> {</span><span class="line">    <span class="k">await</span> <span class="k">import</span>(<span class="s">"@mcp-b/global"</span>);</span><span class="line">    <span class="k">const</span> installed = window.navigator.modelContext;</span><span class="line">    <span class="k">return</span> installed ? <span class="f">detectKind</span>(installed) : <span class="s">"unavailable"</span>;</span><span class="line">  } <span class="k">catch</span> { <span class="k">return</span> <span class="s">"unavailable"</span>; }</span><span class="line">}</span></pre>
+
+      <p>L'<code>import()</code> dinamico è importante: su browser che hanno la nativa, il polyfill non viene mai scaricato. Vite produce un chunk separato, caricato solo se serve.</p>
+
+    </section>
+
+    <!-- =========================================================
+         CHAPTER 5 — ADAPTER TOOL → STORE
+    ========================================================== -->
+    <section class="chapter" id="chapter-5" data-chapter="5">
+      <div class="chapter-head">
+        <div class="roman">V</div>
+        <div>
+          <div class="label">Capitolo V · L'adapter</div>
+          <h2>Un <em>guscio</em> sopra lo store.</h2>
+        </div>
+      </div>
+
+      <p class="lede">I tool WebMCP non duplicano la logica: <em>chiamano lo stesso store</em> che usano i bottoni della UI.</p>
+
+      <p>La regola d'oro: <b class="lift">la business logic vive in un solo posto</b>. Per noi è Zustand (<code>src/store/cart.ts</code>). I bottoni della UI fanno <code>useCartStore.getState().addItem(id, qty)</code>; il tool WebMCP fa <code>useCartStore.getState().addItem(id, qty)</code>. Identico.</p>
+
+      <p>Questo significa che la UI manuale e la UI agentica passano dagli stessi update reattivi — clicchi il bottone o l'agente invoca <code>add_to_cart</code>, il carrello si aggiorna allo stesso modo, con le stesse animazioni di Framer Motion.</p>
+
+      <h3 class="section"><span class="num">§ 5.1</span> Registrazione <em>dual-API</em></h3>
+
+      <p>L'API nativa W3C ha <code>registerTool(tool)</code> per tool singolo. Il polyfill ha <code>provideContext({tools})</code> per la lista intera. Una sola funzione di registrazione, due rami:</p>
+
+<pre data-lang="typescript · src/lib/webmcp.ts (estratto)"><span class="line"><span class="k">let</span> registered = <span class="k">false</span>;</span><span class="line"> </span><span class="line"><span class="k">export async function</span> <span class="f">registerTools</span>(): <span class="n">Promise</span>&lt;<span class="k">void</span>&gt; {</span><span class="line">  <span class="k">if</span> (registered) <span class="k">return</span>;                          <span class="c">// idempotente</span></span><span class="line">  <span class="k">const</span> mc = navigator.modelContext;</span><span class="line">  <span class="k">if</span> (!mc) <span class="k">return</span>;</span><span class="line">  <span class="k">const</span> tools = <span class="f">buildTools</span>();</span><span class="line"> </span><span class="line">  <span class="c">// Native Chrome: registerTool per tool. Dedup via getTools() se disponibile.</span></span><span class="line">  <span class="k">if</span> (<span class="k">typeof</span> mc.registerTool === <span class="s">"function"</span>) {</span><span class="line">    <span class="k">const</span> existing = <span class="k">await</span> <span class="f">listExistingToolNames</span>(mc.getTools);</span><span class="line">    <span class="k">for</span> (<span class="k">const</span> t <span class="k">of</span> tools) {</span><span class="line">      <span class="k">if</span> (existing.has(t.name)) <span class="k">continue</span>;</span><span class="line">      <span class="k">await</span> <span class="n">Promise</span>.<span class="f">resolve</span>(mc.<span class="f">registerTool</span>(t));</span><span class="line">    }</span><span class="line">    registered = <span class="k">true</span>; <span class="k">return</span>;</span><span class="line">  }</span><span class="line"> </span><span class="line">  <span class="c">// Polyfill: provideContext fa il replace della lista.</span></span><span class="line">  <span class="k">if</span> (<span class="k">typeof</span> mc.provideContext === <span class="s">"function"</span>) {</span><span class="line">    mc.<span class="f">provideContext</span>({ tools });</span><span class="line">    registered = <span class="k">true</span>;</span><span class="line">  }</span><span class="line">}</span></pre>
+
+      <div class="callout">
+        <b>Idempotenza</b>
+        Un flag <code>registered</code> impedisce doppie registrazioni quando React re-monta (HMR, StrictMode). Per la native API c'è un secondo livello: <code>getTools()</code> dice quali tool sono già lì, e saltiamo i duplicati. Senza questo, ogni hot reload aggiunge sei tool nuovi.
+      </div>
+    </section>
+
+    <!-- =========================================================
+         CHAPTER 6 — BRIDGE NATIVE
+    ========================================================== -->
+    <section class="chapter" id="chapter-6" data-chapter="6">
+      <div class="chapter-head">
+        <div class="roman">VI</div>
+        <div>
+          <div class="label">Capitolo VI · Bridge native</div>
+          <h2>165 righe<br/>che parlano col <em>relay</em>.</h2>
+        </div>
+      </div>
+
+      <p>Su Canary, l'API nativa <code>navigator.modelContext</code> espone i tool al browser, ma <em>non li manda automaticamente a Claude Desktop</em>. Serve un trasporto. La nostra scelta: aprire un WebSocket direttamente verso <code>webmcp-local-relay</code> e parlarci il suo protocollo.</p>
+
+      <p>Niente estensione, niente embed CDN. Una sola classe di stato e quattro messaggi: <code>server-hello</code>, <code>hello/accepted</code>, <code>invoke</code>, <code>result</code>. Più <code>ping/pong</code> per il keep-alive.</p>
+
+<pre data-lang="typescript · src/lib/relay-client.ts (handshake + dispatch)"><span class="line"><span class="k">const</span> tabId = <span class="n">crypto</span>.<span class="f">randomUUID</span>();</span><span class="line"> </span><span class="line"><span class="k">const</span> <span class="f">connect</span> = () =&gt; {</span><span class="line">  <span class="f">setState</span>(<span class="s">"connecting"</span>);</span><span class="line">  ws = <span class="k">new</span> <span class="f">WebSocket</span>(<span class="s">"ws://127.0.0.1:9333"</span>);</span><span class="line">  ws.<span class="f">addEventListener</span>(<span class="s">"message"</span>, onMessage);</span><span class="line">  ws.<span class="f">addEventListener</span>(<span class="s">"close"</span>, () =&gt; { <span class="f">setState</span>(<span class="s">"closed"</span>); <span class="f">scheduleReconnect</span>(); });</span><span class="line">};</span><span class="line"> </span><span class="line"><span class="k">const</span> <span class="f">onMessage</span> = <span class="k">async</span> (ev) =&gt; {</span><span class="line">  <span class="k">const</span> msg = <span class="n">JSON</span>.<span class="f">parse</span>(ev.data);</span><span class="line">  <span class="k">switch</span> (msg.type) {</span><span class="line">    <span class="k">case</span> <span class="s">"server-hello"</span>:</span><span class="line">      <span class="f">send</span>({ <span class="n">type</span>: <span class="s">"hello"</span>, tabId, <span class="n">origin</span>: location.origin,</span><span class="line">             <span class="n">url</span>: location.href, <span class="n">title</span>: document.title });</span><span class="line">      <span class="f">send</span>({ <span class="n">type</span>: <span class="s">"tools/list"</span>, <span class="n">tools</span>: tools.<span class="f">map</span>(serializeTool) });</span><span class="line">      <span class="k">break</span>;</span><span class="line">    <span class="k">case</span> <span class="s">"hello/accepted"</span>:</span><span class="line">      <span class="f">setState</span>(<span class="s">"open"</span>); reconnectMs = <span class="n">INITIAL_RECONNECT_MS</span>; <span class="k">break</span>;</span><span class="line">    <span class="k">case</span> <span class="s">"ping"</span>: <span class="f">send</span>({ <span class="n">type</span>: <span class="s">"pong"</span> }); <span class="k">break</span>;</span><span class="line">    <span class="k">case</span> <span class="s">"invoke"</span>: {</span><span class="line">      <span class="k">const</span> result = <span class="k">await</span> <span class="f">dispatch</span>(tools, msg.toolName, msg.args ?? {});</span><span class="line">      <span class="f">send</span>({ <span class="n">type</span>: <span class="s">"result"</span>, <span class="n">callId</span>: msg.callId, result });</span><span class="line">      <span class="k">break</span>;</span><span class="line">    }</span><span class="line">  }</span><span class="line">};</span></pre>
+
+      <p>La <code>dispatch</code> è la parte più interessante: <b class="lift">non usiamo executeTool del modelContext nativo</b>. Pesca il tool dalla lista locale e chiama <code>tool.execute(args, fakeClient)</code> direttamente. Questo ci dà tre cose:</p>
+
+      <ol class="numbered">
+        <li><b>Indipendenza dal vendor</b><span>Se l'API native cambia o viene rinominata, il dispatch resta. Il contratto è solo: la <code>Tool</code> ha un <code>execute(args, agent)</code>.</span></li>
+        <li><b>Stessa code-path delle due API</b><span>Il polyfill chiama <code>tool.execute</code>. La nostra dispatch chiama <code>tool.execute</code>. Un singolo set di test copre entrambi.</span></li>
+        <li><b>Conferme controllate</b><span>Il <code>fakeClient.requestUserInteraction</code> è una passthrough che chiama subito la callback. Il modale React di conferma si apre lo stesso (via event bridge), perché è registrato dal lato React e <code>requestCheckoutConfirmation</code> è agnostico.</span></li>
+      </ol>
+
+      <h3 class="section"><span class="num">§ 6.1</span> Reconnect <em>che si comporta bene</em></h3>
+
+      <p>Backoff esponenziale 2s → 30s. Senza, se Claude non è in esecuzione, la tab tenta una connessione al secondo per ore e satura la console. Con backoff: due tentativi nei primi 6 secondi, poi sempre più diradati. Quando Claude torna, ci si riconnette in massimo 30 secondi e l'indicatore va a 🔵 <em>open</em>.</p>
+
+    </section>
+
+    <!-- =========================================================
+         CHAPTER 7 — MEDIAZIONE UTENTE
+    ========================================================== -->
+    <section class="chapter" id="chapter-7" data-chapter="7">
+      <div class="chapter-head">
+        <div class="roman">VII</div>
+        <div>
+          <div class="label">Capitolo VII · Conferma esplicita</div>
+          <h2>L'utente <em>sempre</em> nel loop,<br/>quando conta.</h2>
+        </div>
+      </div>
+
+      <p>Sui sei tool, cinque sono privi di conferma — sono operazioni reversibili o di sola lettura. Il sesto, <code>checkout</code>, è l'unico irreversibile: passa attraverso <code>agent.requestUserInteraction</code> e mostra un modale React. <b class="lift">Senza la conferma, niente ordine.</b></p>
+
+<pre data-lang="typescript · src/lib/webmcp.ts (tool checkout)"><span class="line">{</span><span class="line">  <span class="n">name</span>: <span class="s">"checkout"</span>,</span><span class="line">  <span class="n">description</span>: <span class="s">"Conferma l'ordine. Richiede conferma esplicita dell'utente."</span>,</span><span class="line">  <span class="n">inputSchema</span>: { <span class="n">type</span>: <span class="s">"object"</span>, <span class="n">properties</span>: {} },</span><span class="line">  <span class="k">async</span> <span class="f">execute</span>(_args, agent) {</span><span class="line">    <span class="k">const</span> s = <span class="n">useCartStore</span>.<span class="f">getState</span>();</span><span class="line">    <span class="k">if</span> (s.items.length === <span class="num">0</span>) <span class="k">return</span> <span class="f">err</span>(<span class="s">"Il carrello è vuoto."</span>);</span><span class="line">    <span class="k">const</span> total = s.<span class="f">total</span>();</span><span class="line">    <span class="k">const</span> { requestCheckoutConfirmation } = <span class="k">await</span> <span class="k">import</span>(<span class="s">"./checkout-bridge"</span>);</span><span class="line">    <span class="k">const</span> ask = () =&gt; <span class="f">requestCheckoutConfirmation</span>(total);</span><span class="line"> </span><span class="line">    <span class="c">// Se l'agent espone requestUserInteraction (spec W3C), passa di lì.</span></span><span class="line">    <span class="c">// Altrimenti fallback diretto al bridge — il modale si apre comunque.</span></span><span class="line">    <span class="k">const</span> confirmed = agent?.requestUserInteraction</span><span class="line">      ? <span class="k">await</span> agent.<span class="f">requestUserInteraction</span>(ask)</span><span class="line">      : <span class="k">await</span> <span class="f">ask</span>();</span><span class="line"> </span><span class="line">    <span class="k">if</span> (!confirmed) <span class="k">return</span> <span class="f">ok</span>(<span class="s">"Pagamento annullato dall'utente."</span>);</span><span class="line">    <span class="k">const</span> result = <span class="n">useCartStore</span>.<span class="f">getState</span>().<span class="f">checkout</span>();</span><span class="line">    <span class="k">return</span> <span class="f">ok</span>(<span class="s">`Ordine confermato! Totale: €${result.total.toFixed(2)}.`</span>);</span><span class="line">  }</span><span class="line">}</span></pre>
+
+      <h3 class="section"><span class="num">§ 7.1</span> Il piccolo <em>event-bridge</em></h3>
+
+      <p>Il tool è codice TS puro: non può montare un modale React. Allora abbiamo <code>checkout-bridge.ts</code>, dieci righe di event-passing. Il componente <code>CheckoutModal</code> registra un listener; il tool chiama <code>requestCheckoutConfirmation(total)</code> e attende la promise.</p>
+
+<pre class="inline" data-lang="typescript · src/lib/checkout-bridge.ts"><span class="k">type</span> <span class="n">Listener</span> = (total: <span class="k">number</span>, resolve: (ok: <span class="k">boolean</span>) =&gt; <span class="k">void</span>) =&gt; <span class="k">void</span>;
+<span class="k">let</span> listener: Listener | <span class="k">null</span> = <span class="k">null</span>;
+
+<span class="k">export function</span> <span class="f">setCheckoutListener</span>(fn: Listener | <span class="k">null</span>) { listener = fn; }
+
+<span class="k">export function</span> <span class="f">requestCheckoutConfirmation</span>(total: <span class="k">number</span>): <span class="n">Promise</span>&lt;<span class="k">boolean</span>&gt; {
+  <span class="k">if</span> (!listener) <span class="k">return</span> <span class="n">Promise</span>.<span class="f">resolve</span>(window.<span class="f">confirm</span>(<span class="s">`Pagare €${total.toFixed(2)}?`</span>));
+  <span class="k">return</span> <span class="k">new</span> <span class="n">Promise</span>((resolve) =&gt; listener!(total, resolve));
+}</pre>
+
+      <p>Il fallback a <code>window.confirm</code> è la rete di sicurezza: se il modale non è montato (smoke test, errori di rendering), il pagamento può comunque essere confermato. Importante in demo dal vivo.</p>
+
+      <div class="callout hot">
+        <b>Principio</b>
+        Tutto ciò che un utente prudente non automatizzerebbe va dietro <code>requestUserInteraction</code>. Per noi: solo checkout. Per un CRM: anche delete cliente, invio email, modifica contratto. La lista <em>vive col prodotto</em>.
+      </div>
+
+    </section>
+
+    <!-- =========================================================
+         CHAPTER 8 — VERIFICA END-TO-END
+    ========================================================== -->
+    <section class="chapter" id="chapter-8" data-chapter="8">
+      <div class="chapter-head">
+        <div class="roman">VIII</div>
+        <div>
+          <div class="label">Capitolo VIII · Demo viva</div>
+          <h2>La <em>prova</em> dei sessanta secondi.</h2>
+        </div>
+      </div>
+
+      <p>In Claude Desktop, con relay attivo e tab Bella Roma aperta, chiedi:</p>
+
+      <ol class="numbered">
+        <li><b>"List the connected WebMCP sources"</b><span>Deve apparire la tab <em>Bella Roma Coffee</em> con i sei tool. Se non appare: rileggi §3.2.</span></li>
+        <li><b>"Ordina 2 espresso e 1 cappuccino, applica BENVENUTO e fai checkout"</b><span>L'agente invoca <code>add_to_cart</code> due volte, <code>apply_coupon</code>, poi <code>checkout</code>. Il modale si apre. Confermi. Ordine completato.</span></li>
+        <li><b>"Mostrami solo i caffè sotto i 2 euro"</b><span>Tool: <code>search_products</code> con <code>max_price: 2</code>. Risposta testuale formattata, niente effetti collaterali.</span></li>
+        <li><b>"Svuota il carrello e ricomincia"</b><span>Loop di <code>remove_from_cart</code> sugli item presenti. Tool Activity Log mostra ogni invocazione in tempo reale.</span></li>
+      </ol>
+
+      <h3 class="section"><span class="num">§ 8.1</span> Il <em>Tool Activity Log</em></h3>
+
+      <p>Pannello in basso a destra, sempre visibile. Per ogni invocazione mostra: nome tool, args JSON, risultato testuale, timestamp. Letto da <code>useCartStore</code>: ogni <code>execute</code> chiama <code>logToolCall(name, args, result)</code> dentro lo store. Niente magia, solo un array che cresce.</p>
+
+      <p>È il salvavita della demo dal vivo: se Claude sembra non rispondere, l'Activity Log ti dice subito se il tool è stato chiamato (problema nel modello / nella conferma) o no (problema di trasporto / registrazione).</p>
+
+    </section>
+
+    <!-- =========================================================
+         CHAPTER 9 — FILE MAP
+    ========================================================== -->
+    <section class="chapter" id="chapter-9" data-chapter="9">
+      <div class="chapter-head">
+        <div class="roman">IX</div>
+        <div>
+          <div class="label">Capitolo IX · Anatomia del repo</div>
+          <h2>Dove vive <em>cosa</em>.</h2>
+        </div>
+      </div>
+
+      <p>Tutto il codice rilevante a WebMCP è in <code>src/lib/</code>. La separazione tra <em>lib</em> (pura, testabile) e <em>components</em> (React) è netta — i tool non importano mai componenti, i componenti non importano mai bridge.</p>
+
+      <div class="filemap">
+        <div class="file" data-loc="~270 LoC">
+          <div class="path">src/lib/webmcp.ts</div>
+          <div class="role">Adapter · core</div>
+          <div class="desc"><em>buildTools()</em> ritorna le sei definizioni, <em>registerTools()</em> sceglie tra registerTool nativo e provideContext del polyfill. Idempotente.</div>
+        </div>
+        <div class="file" data-loc="~28 LoC">
+          <div class="path">src/lib/polyfill.ts</div>
+          <div class="role">Detection</div>
+          <div class="desc"><em>ensureWebMCP()</em> ritorna <code>"native"</code> | <code>"polyfill"</code> | <code>"unavailable"</code>. Distingue via <em>constructor.name</em>, import del polyfill solo se serve.</div>
+        </div>
+        <div class="file" data-loc="~52 LoC">
+          <div class="path">src/lib/relay.ts</div>
+          <div class="role">Orchestratore</div>
+          <div class="desc"><em>connectRelay(mode)</em> instrada al bridge corretto. Legge <code>?relay=true</code>. Inietta lo script CDN per il path polyfill, import dinamico per il native.</div>
+        </div>
+        <div class="file" data-loc="~178 LoC">
+          <div class="path">src/lib/relay-client.ts</div>
+          <div class="role">Bridge native</div>
+          <div class="desc">Protocollo relay completo: <em>WebSocket</em> verso 127.0.0.1:9333, hello, tools/list, invoke/result, ping/pong, reconnect con backoff. Espone <em>onRelayState</em>.</div>
+        </div>
+        <div class="file" data-loc="~18 LoC">
+          <div class="path">src/lib/checkout-bridge.ts</div>
+          <div class="role">Event-bridge</div>
+          <div class="desc">Passaggio tra il tool <code>checkout</code> (logica) e il <code>CheckoutModal</code> (UI). Listener + Promise. Fallback a <code>window.confirm</code> se il listener non è registrato.</div>
+        </div>
+        <div class="file" data-loc="~50 LoC">
+          <div class="path">src/lib/products.ts</div>
+          <div class="role">Dati</div>
+          <div class="desc">Catalogo in-memory (12 prodotti), tabella coupon. Niente backend: refresh della pagina = stato pulito. Perfetto per demo.</div>
+        </div>
+        <div class="file" data-loc="~125 LoC">
+          <div class="path">src/store/cart.ts</div>
+          <div class="role">Single source of truth</div>
+          <div class="desc"><em>Zustand store</em>: items, coupon, activity log. Azioni <em>addItem</em>, <em>removeItem</em>, <em>applyCoupon</em>, <em>checkout</em>. Stessa API per UI e tool.</div>
+        </div>
+        <div class="file" data-loc="~70 LoC">
+          <div class="path">src/App.tsx</div>
+          <div class="role">Bootstrap</div>
+          <div class="desc">Effect che chiama <em>ensureWebMCP</em> → <em>registerTools</em> → <em>connectRelay</em>. Espone gli stati al <code>Header</code> per i due indicatori (🟢/🟡, 🔵/🟣).</div>
+        </div>
+      </div>
+
+      <h3 class="section"><span class="num">§ 9.1</span> Le <em>cinque cose</em> da capire</h3>
+      <ol class="numbered">
+        <li><b><code>buildTools()</code></b><span>Lì vivono le sei firme + JSON Schema + execute. Inizia da qui per aggiungere un tool.</span></li>
+        <li><b><code>useCartStore</code></b><span>Single source of truth. Ogni cambiamento di stato deve passare di qui. Niente state in component.</span></li>
+        <li><b><code>ensureWebMCP</code></b><span>Sa quale browser hai davanti. Senza questo, registerTools chiama l'API sbagliata.</span></li>
+        <li><b><code>connectRelay</code></b><span>Decide se aprire WS in-page (native) o caricare l'embed (polyfill). Indipendente da <code>registerTools</code>.</span></li>
+        <li><b><code>relay-client.ts</code></b><span>La parte non-banale del nostro codice. È un client MCP completo in 165 righe.</span></li>
+      </ol>
+
+    </section>
+
+    <!-- =========================================================
+         CHAPTER 10 — ADATTARE A UN SITO PROPRIO
+    ========================================================== -->
+    <section class="chapter" id="chapter-10" data-chapter="10">
+      <div class="chapter-head">
+        <div class="roman">X</div>
+        <div>
+          <div class="label">Capitolo X · Portare lo schema altrove</div>
+          <h2>Su un sito <em>tuo</em>, in sei passi.</h2>
+        </div>
+      </div>
+
+      <p class="lede">L'architettura della demo è progettata per essere copiata: poche unità, contratti piccoli, dipendenze esterne minime. Per portarla su un altro sito basta sostituire la <em>tool surface</em> e lo <em>store</em>.</p>
+
+      <div class="steps-strip">
+        <div class="step"><div class="n">01</div><div class="t">Mappa intenti</div></div>
+        <div class="step"><div class="n">02</div><div class="t">Sostituisci lo store</div></div>
+        <div class="step"><div class="n">03</div><div class="t">Riscrivi <em>buildTools</em></div></div>
+        <div class="step"><div class="n">04</div><div class="t">Schema first</div></div>
+        <div class="step"><div class="n">05</div><div class="t">Conferme</div></div>
+        <div class="step"><div class="n">06</div><div class="t">Pilota in flag</div></div>
+      </div>
+
+      <ol class="numbered">
+        <li><b>Mappa intenti utente</b><span>Per ogni feature ad alto traffico, scrivi la frase che un utente direbbe ad alta voce. Quella è la firma del tool. Mira a 5–10 tool, granularità "intent" non "click".</span></li>
+        <li><b>Identifica il single source of truth</b><span>Redux, Zustand, MobX, context — qualunque esso sia, è lì che vivono le azioni che la UI invoca. Quel codice è già il tuo "execute".</span></li>
+        <li><b>Sostituisci il <code>buildTools</code></b><span>Stessa struttura: <code>name</code>, <code>description</code>, <code>inputSchema</code>, <code>execute</code> che chiama lo store. Cambia solo cosa fa.</span></li>
+        <li><b>JSON Schema stretto</b><span><code>enum</code> dove possibile, <code>minimum/maximum</code> per i numerici, <code>required</code> esplicito. Errori prima dell'invocazione, meno round-trip col modello.</span></li>
+        <li><b>Marca le azioni distruttive</b><span>Cancellazioni, pagamenti, mail, modifiche a dati di terzi. Per ognuna: <code>agent.requestUserInteraction(askConfirm)</code>. Audit log delle decisioni.</span></li>
+        <li><b>Pilota dietro feature flag</b><span>Caricamento polyfill condizionale. Rollout a coorte (dipendenti, beta). KPI: tasso d'uso tool, completamento azione, conferme rifiutate.</span></li>
+      </ol>
+
+      <h4 class="subhead">Cosa NON serve cambiare</h4>
+      <ul class="bullets">
+        <li><code>polyfill.ts</code> — detection generica, funziona ovunque</li>
+        <li><code>relay.ts</code> — orchestrazione bridge agnostica</li>
+        <li><code>relay-client.ts</code> — protocollo standard del relay</li>
+        <li><code>checkout-bridge.ts</code> — utile per qualsiasi conferma modale, basta rinominare</li>
+        <li>Indicatori di Header — funzionano con qualunque tool registrato</li>
+      </ul>
+
+      <div class="callout">
+        <b>Tempo stimato</b>
+        Per un'app React esistente, con uno store ben isolato: <em>2–3 giornate</em> per 3 tool pilota, <em>1–2 settimane</em> per una tool surface completa con conferme e Activity Log. La parte di dominio è quella che pesa, non il bridge.
+      </div>
+
+      <div class="signature">
+        <span class="glyph">§</span>
+        <span>Fine del manuale &middot; v1.0 maggio 2026 &middot; codice in repo</span>
+        <span class="glyph">§</span>
+      </div>
+
+    </section>
+
+    <!-- ===== CLOSING ===== -->
+    <div class="closing">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(239,230,209,.55);margin-bottom:1rem;">— Coda</div>
+      <h2>Adesso <em>il</em> codice è davanti a te.<br/>Apri <em>src/lib/</em>.</h2>
+      <p style="color:rgba(239,230,209,.78);font-family:var(--serif);font-style:italic;font-size:22px;max-width:42ch;line-height:1.35">Sei file, meno di 700 righe TypeScript per tutta la parte WebMCP. Il resto è React come l'hai sempre scritto.</p>
+      <div class="pillrow">
+        <a href="presentazione.html">↩ Torna alla presentazione</a>
+        <a href="https://webmachinelearning.github.io/webmcp/" target="_blank" rel="noopener">Spec W3C ↗</a>
+        <a href="https://github.com/WebMCP-org" target="_blank" rel="noopener">WebMCP-org ↗</a>
+        <span class="pill">Reply &middot; v1.0 &middot; 2026</span>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ============ RIGHT RAIL : MARGINALIA ============ -->
+  <aside class="marginalia" aria-hidden="true">
+    <div class="note">
+      <b>Margine</b>
+      Il TOC a sinistra è sticky: il capitolo corrente si evidenzia mano a mano che scrolli. Su mobile collassa sopra il contenuto.
+    </div>
+  </aside>
+
+</div>
+
+<script>
+(() => {
+  const sb = document.getElementById('scrollbar');
+  const tocLinks = [...document.querySelectorAll('aside.toc li')];
+  const chapters = [...document.querySelectorAll('section.chapter')];
+
+  function onScroll() {
+    const h = document.documentElement;
+    const max = h.scrollHeight - h.clientHeight;
+    const p = Math.min(100, Math.max(0, (h.scrollTop / max) * 100));
+    sb.style.setProperty('--p', p + '%');
+
+    // current chapter
+    const y = h.scrollTop + h.clientHeight * 0.3;
+    let curIdx = 0;
+    for (let i = 0; i < chapters.length; i++) {
+      if (chapters[i].offsetTop <= y) curIdx = i;
+    }
+    tocLinks.forEach((li, i) => li.classList.toggle('is-current', i === curIdx));
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  onScroll();
+})();
+</script>
+
+</body>
+</html>

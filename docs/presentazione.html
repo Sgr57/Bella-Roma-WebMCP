@@ -887,7 +887,7 @@
         </svg>
         Reply &middot; Briefing tecnico
       </span>
-      <span>2026 · 01 / 27</span>
+      <span>2026 · 01 / 29</span>
     </div>
     <div class="stagger">
       <h1>
@@ -1572,10 +1572,140 @@
     </div>
   </section>
 
-  <!-- ============================================================ 25 — NEXT STEPS -->
+  <!-- ============================================================ 25 — DEMO BELLA ROMA · OVERVIEW -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">25</span><span class="dot"></span>Demo concreta · Bella Roma Coffee</div>
+      <h2>Non un <span class="strike">case study</span>. <em>Codice che gira</em>.</h2>
+      <div class="grid-5-7" style="margin-top:1rem">
+        <div style="max-width:38ch">
+          <p class="lead" style="margin-bottom:1.4rem"><em>Bella Roma Coffee</em> è un coffee shop fittizio &mdash; React + Vite + Zustand &mdash; che espone <em>sei tool WebMCP</em> a Claude Desktop. <span class="non-italic" style="font-family:var(--sans);font-size:15px;color:var(--ink-soft)">Da prompt vocale a checkout in &lt;60 secondi.</span></p>
+          <hr class="rule" />
+          <div class="label-s" style="margin-bottom:.8rem">Costo di sviluppo</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div>
+              <div style="font-family:var(--serif);font-size:48px;line-height:.9;color:var(--green);font-style:italic">~700</div>
+              <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--ink-mute);text-transform:uppercase;margin-top:.3rem">LoC TS · tutta la parte WebMCP</div>
+            </div>
+            <div>
+              <div style="font-family:var(--serif);font-size:48px;line-height:.9;color:var(--green);font-style:italic">0</div>
+              <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--ink-mute);text-transform:uppercase;margin-top:.3rem">estensioni browser richieste</div>
+            </div>
+          </div>
+          <hr class="rule" />
+          <p style="font-size:14px;color:var(--ink-mute);font-style:italic;font-family:var(--serif);font-size:17px;line-height:1.4">"Ordina 2 espresso e 1 cappuccino,<br/>applica BENVENUTO e fai checkout"</p>
+        </div>
+        <div>
+          <table class="compare" style="margin-top:0">
+            <thead>
+              <tr>
+                <th>Tool</th>
+                <th>Cosa fa</th>
+                <th class="web">Conferma</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>search_products</td><td>Filtra catalogo per categoria, prezzo, testo</td><td style="color:var(--ink-mute);font-family:var(--serif);font-style:italic">no</td></tr>
+              <tr><td>add_to_cart</td><td>Aggiunge <code>product_id</code> × <code>quantity</code></td><td style="color:var(--ink-mute);font-family:var(--serif);font-style:italic">no</td></tr>
+              <tr><td>remove_from_cart</td><td>Rimuove una riga</td><td style="color:var(--ink-mute);font-family:var(--serif);font-style:italic">no</td></tr>
+              <tr><td>apply_coupon</td><td><code>BENVENUTO</code> -10% · <code>STUDENTI</code> -20% (max €5)</td><td style="color:var(--ink-mute);font-family:var(--serif);font-style:italic">no</td></tr>
+              <tr><td>get_cart</td><td>Stato + subtotale, sconto, totale</td><td style="color:var(--ink-mute);font-family:var(--serif);font-style:italic">no</td></tr>
+              <tr><td>checkout</td><td class="web"><b style="font-family:var(--serif);font-style:italic;font-size:17px">Conferma ordine</b>, svuota carrello</td><td style="color:var(--hot);font-family:var(--serif);font-style:italic;font-weight:500">sì · modale React</td></tr>
+            </tbody>
+          </table>
+          <div class="quote-box" style="margin-top:1.4rem">
+            <b>Punto chiave</b>
+            UI manuale e UI agentica chiamano gli <em>stessi</em> reducer Zustand. Una sola business logic da mantenere. Il tool WebMCP è solo un <em>wrapper</em>.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 26 — DEMO BELLA ROMA · ARCHITETTURA DUAL-BRIDGE -->
+  <section class="slide">
+    <div class="stagger" style="display:flex;flex-direction:column;height:100%">
+      <div class="kicker"><span class="num">26</span><span class="dot"></span>Demo concreta · Architettura dual-bridge</div>
+      <h2>Funziona <em>ovunque</em>: nativo o polyfill, stesso sito.</h2>
+      <div class="grid-7-5" style="margin-top:1rem">
+        <div>
+          <div class="surface" style="padding:1.4rem 1.6rem 1rem;background:linear-gradient(180deg,var(--paper-soft),var(--paper));position:relative">
+            <div class="label-s" style="display:flex;justify-content:space-between;margin-bottom:1rem">
+              <span style="color:var(--green)">Fig. — routing dei bridge</span>
+              <span>src/lib/relay.ts</span>
+            </div>
+            <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+              <defs>
+                <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                  <path d="M0,0 L10,5 L0,10 Z" fill="#0d1812"/>
+                </marker>
+                <pattern id="hp" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <line x1="0" y1="0" x2="0" y2="6" stroke="#0d5a3d" stroke-opacity=".18" stroke-width="1"/>
+                </pattern>
+              </defs>
+              <!-- Claude Desktop -->
+              <rect x="290" y="14" width="180" height="50" rx="2" fill="#0d5a3d"/>
+              <text x="380" y="38" text-anchor="middle" font-family="Instrument Serif, serif" font-style="italic" font-size="20" fill="#efe6d1">Claude Desktop</text>
+              <text x="380" y="54" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="8.5" letter-spacing="2" fill="#7de8a8">CLIENT MCP STDIO</text>
+              <!-- arrow -->
+              <line x1="380" y1="64" x2="380" y2="108" stroke="#0d1812" stroke-width="1.4" marker-end="url(#ar)"/>
+              <text x="395" y="92" font-family="IBM Plex Mono" font-size="9.5" fill="#6b7c70">stdio MCP</text>
+              <!-- relay -->
+              <rect x="265" y="108" width="230" height="50" fill="none" stroke="#0d1812" stroke-width="1.5"/>
+              <rect x="265" y="108" width="230" height="50" fill="url(#hp)"/>
+              <text x="380" y="132" text-anchor="middle" font-family="Instrument Serif, serif" font-style="italic" font-size="18" fill="#0d1812">webmcp-local-relay</text>
+              <text x="380" y="148" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#6b7c70" letter-spacing="1.2">127.0.0.1:9333 · avviato da Claude</text>
+              <!-- WS branches -->
+              <path d="M 320 158 Q 320 188 170 200" fill="none" stroke="#2563b8" stroke-width="1.6" marker-end="url(#ar)"/>
+              <path d="M 440 158 Q 440 188 600 200" fill="none" stroke="#6b3fa8" stroke-width="1.6" marker-end="url(#ar)"/>
+              <text x="220" y="186" font-family="IBM Plex Mono" font-size="9" fill="#2563b8" letter-spacing="1">WS · 9333</text>
+              <text x="500" y="186" font-family="IBM Plex Mono" font-size="9" fill="#6b3fa8" letter-spacing="1">WS · via iframe</text>
+              <!-- left: native -->
+              <rect x="30" y="200" width="280" height="106" fill="rgba(37,99,184,.06)" stroke="#2563b8" stroke-width="1.5" rx="2"/>
+              <text x="50" y="222" font-family="IBM Plex Mono" font-size="9" letter-spacing="1.4" fill="#2563b8">CANARY 146 · NATIVE</text>
+              <text x="50" y="246" font-family="Instrument Serif, serif" font-style="italic" font-size="20" fill="#0d1812">navigator.modelContext</text>
+              <text x="50" y="265" font-family="IBM Plex Mono" font-size="10" fill="#2c3a30">registerTool(t) ×6 · spec W3C</text>
+              <text x="50" y="282" font-family="IBM Plex Mono" font-size="10" fill="#2c3a30">+ relay-client.ts (~165 LoC)</text>
+              <text x="50" y="299" font-family="IBM Plex Mono" font-size="10" fill="#6b7c70">hello · invoke · pong · reconnect</text>
+              <!-- right: polyfill -->
+              <rect x="450" y="200" width="280" height="106" fill="rgba(107,63,168,.06)" stroke="#6b3fa8" stroke-width="1.5" rx="2"/>
+              <text x="470" y="222" font-family="IBM Plex Mono" font-size="9" letter-spacing="1.4" fill="#6b3fa8">CHROME STABLE · POLYFILL</text>
+              <text x="470" y="246" font-family="Instrument Serif, serif" font-style="italic" font-size="20" fill="#0d1812">@mcp-b/global</text>
+              <text x="470" y="265" font-family="IBM Plex Mono" font-size="10" fill="#2c3a30">provideContext({tools})</text>
+              <text x="470" y="282" font-family="IBM Plex Mono" font-size="10" fill="#2c3a30">+ embed.js (CDN jsDelivr)</text>
+              <text x="470" y="299" font-family="IBM Plex Mono" font-size="10" fill="#6b7c70">iframe hidden auto-iniettato</text>
+            </svg>
+            <div style="display:flex;gap:1.6rem;flex-wrap:wrap;margin-top:1rem;padding-top:.8rem;border-top:1px dashed var(--ink-faint);font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-mute)">
+              <span><span style="display:inline-block;width:9px;height:9px;background:#2563b8;border-radius:50%;margin-right:6px;vertical-align:middle"></span>path native</span>
+              <span><span style="display:inline-block;width:9px;height:9px;background:#6b3fa8;border-radius:50%;margin-right:6px;vertical-align:middle"></span>path polyfill</span>
+            </div>
+          </div>
+        </div>
+        <div style="max-width:40ch">
+          <div class="label-s" style="margin-bottom:.7rem;color:var(--green)">Cosa fa la differenza</div>
+          <p style="font-size:16px;line-height:1.6">La detection in <code>src/lib/polyfill.ts</code> legge <code>constructor.name</code> per distinguere <b style="font-family:var(--serif);font-style:italic;color:var(--ink)">ModelContext</b> (Canary) da <b style="font-family:var(--serif);font-style:italic;color:var(--ink)">BrowserMcpServer</b> (polyfill). Il solo <code>'modelContext' in navigator</code> mente.</p>
+          <hr class="rule" />
+          <div class="label-s" style="margin-bottom:.7rem">Toggle in header</div>
+          <ul style="font-size:14px;line-height:1.8">
+            <li>· 🟢 <em>nativo</em> + 🔵 <em>native WS open</em></li>
+            <li>· 🟡 <em>polyfill</em> + 🟣 <em>embed CDN</em></li>
+            <li>· ⚪ off — fallback manuale alla UI</li>
+          </ul>
+          <hr class="rule" />
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem">
+            <span class="pill solid">Manuale tecnico ↗</span>
+            <span class="pill green">HOW-TO-IMPLEMENT.html</span>
+          </div>
+          <p style="font-size:13px;color:var(--ink-mute);margin-top:.7rem;font-style:italic">Step-by-step di implementazione &mdash; file per file &mdash; nel manuale companion.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ 27 — NEXT STEPS -->
   <section class="slide closing">
     <div class="stagger" style="display:flex;flex-direction:column;width:100%">
-      <div class="kicker"><span class="num">25</span><span class="dot"></span>Conclusioni</div>
+      <div class="kicker"><span class="num">27</span><span class="dot"></span>Conclusioni</div>
       <h2>Cosa <em>chiediamo</em> dopo questa slide.</h2>
       <ol class="next-list">
         <li>Sponsor di un <b>pilot interno</b> da 2–3 settimane: una mini-app, 3 tool, demo end-to-end con Claude.</li>
@@ -1589,7 +1719,7 @@
   <!-- ============================================================ 26 — RISORSE -->
   <section class="slide">
     <div class="stagger" style="display:flex;flex-direction:column;height:100%">
-      <div class="kicker"><span class="num">26</span><span class="dot"></span>Risorse</div>
+      <div class="kicker"><span class="num">28</span><span class="dot"></span>Risorse</div>
       <h2>Per <em>approfondire</em>.</h2>
       <div class="grid-3" style="margin-top:1.5rem">
         <div>
@@ -1631,19 +1761,22 @@
             <li>· Simon Willison — MCP prompt injection problems</li>
           </ul>
           <hr class="rule" />
-          <div class="quote-box" style="font-size:14px">
-            <b>Fonte di questo briefing</b>
-            <code>RESEARCH.md</code> — sintesi maggio 2026.
-          </div>
+          <div class="label-s" style="margin-bottom:1rem;color:var(--green)">Companion · questo repo</div>
+          <ul style="font-size:13.5px;line-height:1.9">
+            <li>· <code><a href="HOW-TO-IMPLEMENT.html" style="color:var(--green);text-decoration:none;border-bottom:1px solid var(--green)">HOW-TO-IMPLEMENT.html</a></code> &mdash; manuale step-by-step</li>
+            <li>· <code>README.md</code> &mdash; quick start della demo</li>
+            <li>· <code>RESEARCH.md</code> &mdash; sintesi maggio 2026</li>
+            <li>· <code>src/lib/</code> &mdash; tutto il codice WebMCP</li>
+          </ul>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ============================================================ 27 — THANKS -->
+  <!-- ============================================================ 29 — THANKS -->
   <section class="slide thanks dark">
     <div class="stagger" style="width:100%">
-      <div class="kicker" style="color:var(--green-glow)"><span class="num" style="color:rgba(239,230,209,.45);border-right-color:rgba(239,230,209,.2)">27</span><span class="dot" style="background:var(--green-glow);box-shadow:0 0 0 4px rgba(125,232,168,.18)"></span>Fine</div>
+      <div class="kicker" style="color:var(--green-glow)"><span class="num" style="color:rgba(239,230,209,.45);border-right-color:rgba(239,230,209,.2)">29</span><span class="dot" style="background:var(--green-glow);box-shadow:0 0 0 4px rgba(125,232,168,.18)"></span>Fine</div>
       <h1>Grazie.<br/><em>Domande?</em></h1>
       <div class="meta">
         <span><b>Reply</b> · Briefing tecnico WebMCP</span>
