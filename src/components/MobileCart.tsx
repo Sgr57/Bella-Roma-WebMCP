@@ -39,15 +39,20 @@ export function MobileCart() {
     lastCountRef.current = items.length;
   }, [items.length, collapsed]);
 
-  // Lock body scroll while expanded on mobile, so the page can't scroll
-  // underneath when the user drags the sheet down (no backdrop here).
+  // Lock body scroll while expanded on mobile. Compensate the disappearing
+  // scrollbar with padding-right so the layout doesn't jump.
   useEffect(() => {
     if (collapsed || typeof window === "undefined") return;
     if (!window.matchMedia("(max-width: 1023.98px)").matches) return;
-    const prev = document.body.style.overflow;
+    const scrollbarW =
+      window.innerWidth - document.documentElement.clientWidth;
+    const prevOverflow = document.body.style.overflow;
+    const prevPadding = document.body.style.paddingRight;
     document.body.style.overflow = "hidden";
+    if (scrollbarW > 0) document.body.style.paddingRight = `${scrollbarW}px`;
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPadding;
     };
   }, [collapsed]);
 
