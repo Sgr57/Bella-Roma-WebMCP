@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { TOP_PROMPTS } from "../lib/prompts";
+import { useCartStore } from "../store/cart";
 
 function ClipboardIcon() {
   return (
@@ -38,6 +39,10 @@ function CheckIcon() {
 
 export function DemoBanner() {
   const [copied, setCopied] = useState<string | null>(null);
+  const cartEmpty = useCartStore((s) => s.items.length === 0);
+  const visiblePrompts = TOP_PROMPTS.filter(
+    (p) => !(p.requires_cart && cartEmpty),
+  );
 
   const copy = async (p: string) => {
     try {
@@ -57,7 +62,7 @@ export function DemoBanner() {
             💡 I più chiesti
           </p>
           <ul className="flex flex-wrap gap-1.5">
-            {TOP_PROMPTS.map(({ id, text: p }) => {
+            {visiblePrompts.map(({ id, text: p }) => {
               const flash = copied === p;
               return (
                 <li key={id}>
