@@ -152,13 +152,18 @@ export function Header({ connection, relay, relayVariant, relayState }: Props) {
       <div className="bg-white px-6 h-20 flex items-center">
         <div className="max-w-7xl mx-auto w-full grid grid-cols-3 items-center">
           <div className="flex items-center gap-3 justify-self-start">
-            <span className="text-4xl">☕</span>
+            <img
+              src="/brand/mark.webp"
+              alt="Bella Roma"
+              className="h-12 w-12 object-contain"
+              decoding="async"
+            />
             <div>
               <h1 className="font-display text-2xl font-bold text-lavazza-deep tracking-tight leading-none">
                 Bella Roma
               </h1>
               <p className="text-[10px] uppercase tracking-[0.2em] text-coffee-mid mt-1.5">
-                Torino · Italia · 1962
+                Roma · Italia · 1962
               </p>
             </div>
           </div>

@@ -16,7 +16,10 @@
     "imagegen:dry:editorial": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style editorial --test --dry-run",
     "imagegen:dry:dipinto": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style dipinto --test --dry-run",
     "imagegen:cf:test:editorial": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style editorial --test --provider cloudflare",
-    "imagegen:cf:test:dipinto": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style dipinto --test --provider cloudflare"
+    "imagegen:cf:test:dipinto": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style dipinto --test --provider cloudflare",
+    "imagegen:hero": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-hero.ts",
+    "imagegen:logo": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-logo.ts",
+    "imagegen:favicon": "tsx scripts/gen-favicon.ts"
   },
   "dependencies": {
     "@mcp-b/global": "^2.3.2",

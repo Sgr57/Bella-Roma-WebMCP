@@ -30,12 +30,15 @@ export interface GenerateOptions {
   model: string;             // accepts any model valid for the chosen provider
   outDir: string;
   format?: ImageFormat;      // sharp output container (default: "webp")
-  size?: number;             // sharp output square px (default: 512)
+  size?: number;             // sharp output square px (default: 512). Used when outWidth/outHeight not provided.
+  outWidth?: number;         // sharp output width override (rectangular)
+  outHeight?: number;        // sharp output height override (rectangular)
   encodeQuality?: number;    // sharp encoder quality 0-100 (default: 85)
   quality?: GenQuality;      // provider generation quality (default: "medium")
   steps?: number;            // diffusion steps; Flux-family only
   width?: number;            // requested generation width (default: 1024)
   height?: number;           // requested generation height (default: 1024)
+  background?: "auto" | "transparent" | "opaque"; // gpt-image-1 only
   force?: boolean;
   dryRun?: boolean;
   saveSidecar?: boolean;
@@ -85,6 +88,12 @@ export interface ProviderRequest {
   quality?: GenQuality;
   width?: number;
   height?: number;
+  /**
+   * Background mode. Only OpenAI gpt-image-1 supports this today; other
+   * providers silently ignore. "transparent" requires a format that supports
+   * alpha (webp or png — NOT jpeg).
+   */
+  background?: "auto" | "transparent" | "opaque";
 }
 
 // Common interface implemented by every provider.
@@ -105,7 +114,14 @@ export interface SidecarMeta {
   quality?: GenQuality;
   format: ImageFormat;
   size: number;
+  outWidth: number;
+  outHeight: number;
   encodeQuality: number;
+  background?: "auto" | "transparent" | "opaque";
+  /** Average color of the four corners — useful for matching a host page bg
+      so the image blends seamlessly into the surrounding layout.
+      Omitted when background=transparent (alpha pixels would skew the sample). */
+  dominantCornerColor?: { r: number; g: number; b: number; hex: string };
   generatedAt: string;
   durationMs: number;
 }

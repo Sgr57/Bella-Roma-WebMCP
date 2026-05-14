@@ -1,0 +1,17 @@
+{
+  "id": "mark",
+  "provider": "openai",
+  "model": "gpt-image-1",
+  "prompt": "A minimalist heraldic emblem on fully TRANSPARENT background — no surface, no card, no paper, no shadow plate, no frame. Each visual element cleanly cut out and floating on transparency. Single-color flat vector illustration in solid deep navy color hex #051432, uniform crisp stroke weight, no gradients, no fill variations, no shadows, no 3D — clean geometric heraldry style, like an engraved printer's mark. Composition: a vertically symmetric oval LAUREL WREATH formed by two delicate slender branches with small pointed leaves; the branches ascend from the bottom-left and bottom-right corners of the central area, curve gracefully upward, and meet at the top in a small elegant flourish (two leaf tips touching). The two branches together enclose a clean hollow oval space at the center. Inside the oval, perfectly centered and at appropriate scale: a single COFFEE BEAN seen from the front view, simplified vector silhouette, with its iconic vertical central groove clearly visible. The bean is solid navy, same color as the wreath. Style reference: classical Roman heraldic seal, vintage Italian café stamp, old book frontispiece mark. Elegant, refined, premium, NOT cartoonish, NOT overly ornate. Square 1024x1024 canvas. The entire emblem (wreath + bean) occupies approximately 55-60% of the canvas, perfectly centered, with generous transparent padding on all four sides. ABSOLUTELY NO text, NO letters, NO words, NO numbers, NO Latin inscriptions, NO date, NO brand name, NO captions, NO ribbons with writing — the emblem must be purely graphic, language-agnostic.",
+  "negativePrompt": "text, letters, words, characters, alphabet, typography, numbers, date, year, latin inscription, ribbon with text, watermark, gradient, color variation, multi-color, photorealistic, 3D rendering, shadow, drop shadow, surface, paper background, cluttered, busy, cartoon, mascot, photographic, realistic coffee bean photograph",
+  "seed": 1962,
+  "quality": "high",
+  "format": "webp",
+  "size": 512,
+  "outWidth": 1024,
+  "outHeight": 1024,
+  "encodeQuality": 95,
+  "background": "transparent",
+  "generatedAt": "2026-05-14T15:09:00.933Z",
+  "durationMs": 35950
+}

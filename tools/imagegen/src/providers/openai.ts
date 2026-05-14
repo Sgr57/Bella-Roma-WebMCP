@@ -90,6 +90,12 @@ export class OpenAIProvider implements ImageProvider {
     if (this.model === "gpt-image-1") {
       // gpt-image-1 returns b64_json by default (response_format is not accepted).
       body.quality = req.quality ?? "medium";
+      if (req.background && req.background !== "auto") {
+        body.background = req.background;
+        // Transparent bg requires a format with alpha. PNG is the safest default;
+        // WebP also supports alpha but PNG is universally interoperable.
+        body.output_format = req.background === "transparent" ? "png" : "png";
+      }
     } else if (this.model === "dall-e-3") {
       body.response_format = "b64_json";
       body.quality = req.quality === "high" ? "hd" : "standard";

@@ -56,7 +56,12 @@ export function Footer() {
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 pb-10 border-b border-lavazza-line">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <span className="text-3xl">☕</span>
+              <img
+                src="/brand/mark.webp"
+                alt="Bella Roma"
+                className="h-10 w-10 object-contain"
+                decoding="async"
+              />
               <h2 className="font-display text-xl font-bold text-lavazza-deep tracking-tight">
                 Bella Roma
               </h2>

@@ -1,0 +1,17 @@
+{
+  "id": "banner",
+  "provider": "openai",
+  "model": "gpt-image-1",
+  "prompt": "Premium editorial flat-lay photography composition with a fully TRANSPARENT background — no surface, no paper, no studio backdrop, no shadow plate. Each element must be cleanly cut out and floating on transparency, ready to be composited onto any web page. Wide 3:2 horizontal canvas, arrangement spread across the frame. LEFT SIDE (object zone): a small white porcelain espresso demitasse seen from a slight high angle showing dark crema and a faint steam wisp, three or four scattered roasted coffee beans, one glossy green coffee plant leaf with subtle veining, asymmetric organic placement. RIGHT SIDE (object zone): an open small burlap sack tilted toward the camera with roasted coffee beans gently spilling, two coffee leaves arranged loosely, two more scattered beans, a small wooden coffee spoon. CENTRAL AREA: completely empty, no objects, generous transparent negative space reserved for typography overlay. Each element rendered photorealistic, hyper-detailed, refined Italian café aesthetic, soft diffused light coming from upper-left, very subtle short contact shadow directly beneath each object only (no large cast shadows that would imply a surface). No text, no logos, no watermarks, no captions, no packaging branding, no human hands, no people.",
+  "negativePrompt": "background color, paper, surface, studio backdrop, tabletop, cream background, white background, large cast shadow, ground plane, text, watermark, logo, brand name, hands, people, cluttered center",
+  "seed": 42,
+  "quality": "high",
+  "format": "webp",
+  "size": 512,
+  "outWidth": 1536,
+  "outHeight": 1024,
+  "encodeQuality": 92,
+  "background": "transparent",
+  "generatedAt": "2026-05-14T14:53:46.908Z",
+  "durationMs": 60379
+}

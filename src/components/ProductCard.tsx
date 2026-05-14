@@ -91,14 +91,14 @@ export function ProductCard({ product }: Props) {
             const v = TAG_VARIANT[tag] ?? "info";
             const cls =
               v === "new"
-                ? "bg-coffee-dark text-white"
+                ? "bg-coffee-cream/90 text-coffee-dark border border-coffee-cream"
                 : v === "promo"
-                  ? "bg-white text-coffee-accent border border-coffee-accent/30"
-                  : "bg-lavazza-deep text-white";
+                  ? "bg-coffee-accent/12 text-coffee-accent border border-coffee-accent/35"
+                  : "bg-white/85 text-coffee-mid border border-lavazza-line";
             return (
               <span
                 key={tag}
-                className={`${cls} text-[10px] font-medium px-2 py-0.5 rounded-md uppercase tracking-wider`}
+                className={`${cls} text-[9.5px] font-medium px-2 py-0.5 rounded-sm uppercase tracking-[0.08em] backdrop-blur-sm`}
               >
                 {tag}
               </span>
@@ -109,7 +109,7 @@ export function ProductCard({ product }: Props) {
 
       {customizable && product.available && (
         <div className="absolute top-3 right-3 z-10">
-          <span className="inline-flex items-center gap-1 bg-coffee-accent/10 text-coffee-accent text-[9px] font-bold px-2 py-0.5 rounded-pill uppercase tracking-[0.1em]">
+          <span className="inline-flex items-center gap-1 bg-coffee-cream text-coffee-accent border border-coffee-accent/45 text-[9px] font-semibold px-2 py-0.5 rounded-pill uppercase tracking-[0.1em]">
             <svg
               viewBox="0 0 24 24"
               fill="none"
