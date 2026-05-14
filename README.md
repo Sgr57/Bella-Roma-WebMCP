@@ -2,7 +2,9 @@
 
 > **Proof-of-Concept**: una vetrina e‑commerce *agent-ready*. Un agente AI (Claude Desktop) ordina caffè, applica coupon e fa checkout su una pagina React **senza** vedere il DOM, senza scraper, senza pilotare il cursore — chiama direttamente i tool che la pagina espone.
 
-Single-page React app che simula la torrefazione fittizia **Bella Roma Coffee** ed espone le sue azioni come **7 tool WebMCP** invocabili da un agente AI nel browser tramite `navigator.modelContext`. Pensata per una demo da 60 secondi davanti a stakeholder non tecnici, ma costruita su standard reali (W3C Draft Community Group Report, febbraio 2026).
+🌐 **Demo live**: <https://bella-roma-web-mcp.vercel.app/> — apri il link, attiva il toggle `Relay · Off → CDN` in header e collega Claude Desktop (vedi Step 2 più sotto). Niente da installare lato sito.
+
+Single-page React app che simula la torrefazione fittizia **Bella Roma Coffee** ed espone le sue azioni come **9 tool WebMCP** invocabili da un agente AI nel browser tramite `navigator.modelContext`. Pensata per una demo da 60 secondi davanti a stakeholder non tecnici, ma costruita su standard reali (W3C Draft Community Group Report, febbraio 2026).
 
 Il catalogo include 27 prodotti (13 drink, 4 food, 3 chicchi take-home, 2 capsule, 5 opzioni latte di cui una "esaurita" per dimostrare la sostituzione). Ogni prodotto è annotato con intensità, origine, note aromatiche, dietary, tag, pairing, prodotti correlati e opzioni di personalizzazione (size / latte / zucchero). Il set di tool resta volutamente minimale: l'agente compone primitive piccole invece di chiamare endpoint di alto livello.
 
@@ -19,12 +21,16 @@ Il catalogo include 27 prodotti (13 drink, 4 food, 3 chicchi take-home, 2 capsul
 
 ## Quick start
 
+**In locale:**
+
 ```bash
 npm install
 npm run dev
 ```
 
 Apri http://localhost:5173
+
+**Senza installare nulla:** apri direttamente la versione deployata su <https://bella-roma-web-mcp.vercel.app/> — funziona con Chrome stabile via polyfill `@mcp-b/global` da CDN.
 
 ## Guida al test passo-passo
 
