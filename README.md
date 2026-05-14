@@ -96,13 +96,13 @@ Apri **Claude Desktop** e scrivi:
 
 > *Mostrami le sorgenti WebMCP collegate.*
 
-Claude deve elencare la tab **"Bella Roma Coffee"** con i suoi **7 tool** (`search_products`, `get_product`, `add_to_cart`, `remove_from_cart`, `apply_coupon`, `get_cart`, `checkout`).
+Claude deve elencare la tab **"Bella Roma Coffee"** con i suoi **9 tool** (`search_products`, `get_product`, `add_to_cart`, `remove_from_cart`, `apply_coupon`, `remove_coupon`, `clear_cart`, `get_cart`, `checkout`).
 
 Se Claude dice "nessuna sorgente collegata", ricontrolla Step 2 e Step 3.
 
 ### Step 5 — Fai un giro di prova
 
-Cinque scenari pronti. Copia-incolla in Claude Desktop, **guarda la pagina mentre Claude lavora**: il carrello cambia in diretta e il **Tool Activity Log** in basso a destra registra ogni chiamata.
+Sei scenari pronti. Copia-incolla in Claude Desktop, **guarda la pagina mentre Claude lavora**: il carrello cambia in diretta e il **Tool Activity Log** in basso a destra registra ogni chiamata.
 
 1. **Filtro da linguaggio naturale**
    > *Qualcosa di leggero e fruttato, senza latte, sotto i 4 euro. Aggiungilo al carrello.*
@@ -129,7 +129,12 @@ Cinque scenari pronti. Copia-incolla in Claude Desktop, **guarda la pagina mentr
 
    `apply_coupon` applica lo sconto, poi `checkout` chiama `agent.requestUserInteraction` e apre **un modale di conferma a video**. **Cosa guardare**: l'AI **non** conferma da sola — clicchi tu. È il punto chiave di WebMCP: l'azione irreversibile resta sotto controllo umano.
 
-Per ricominciare da zero: clicca **`Reset demo`** in header. Svuota carrello, coupon e log.
+6. **Reset conversazionale**
+   > *Annulla tutto, ricomincio da capo.*
+
+   L'agente chiama `clear_cart` (svuota carrello + rimuove coupon in un colpo solo). **Cosa guardare**: il carrello si azzera dal log, niente loop di `remove_from_cart` per ogni riga.
+
+Per ricominciare da zero anche fuori da Claude: clicca **`Reset demo`** in header. Svuota carrello, coupon e log.
 
 > Suggerimento: nel banner **"I più chiesti"** in alto alla pagina trovi i prompt principali pronti al click — un click li copia negli appunti, poi incolli in Claude Desktop.
 
