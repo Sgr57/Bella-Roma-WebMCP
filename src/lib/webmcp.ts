@@ -43,7 +43,16 @@ function validateQuantity(
 
 export type ToolContent =
   | { type: "text"; text: string }
-  | { type: "image"; data: string; mimeType: string };
+  | { type: "image"; data: string; mimeType: string }
+  | {
+      type: "resource";
+      resource: {
+        uri: string;
+        mimeType: string;
+        text: string;
+        _meta?: Record<string, unknown>;
+      };
+    };
 
 export type ToolResult = {
   content: ToolContent[];
@@ -66,6 +75,61 @@ function ok(text: string): ToolResult {
 }
 function err(text: string): ToolResult {
   return { content: [{ type: "text", text }], isError: true };
+}
+
+// MIME type per MCP Apps (spec 2026-01-26). Risorse servite con questo
+// profilo vengono renderizzate in iframe sandboxed dai client che supportano
+// MCP Apps (Claude, ChatGPT, VS Code Insiders, Goose).
+const MCP_APP_MIME = "text/html;profile=mcp-app";
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Builda l'HTML di una product card per il content block MCP App.
+// Stand-alone, CSS inline, immagine via <img src> (richiede CSP resourceDomains
+// che permetta il dominio host, vedi `_meta.ui.csp.resourceDomains` sotto).
+function buildProductCardHtml(p: {
+  name: string;
+  price: number;
+  description: string;
+  imgSrc: string;
+}): string {
+  const safeName = escapeHtml(p.name);
+  const safeDesc = escapeHtml(p.description);
+  // Per data: URL non eseguiamo escape: il base64 è già URL-safe; escape
+  // romperebbe i caratteri `+` e `=`. Per http(s): URL passa per escapeHtml.
+  const safeImg = p.imgSrc.startsWith("data:")
+    ? p.imgSrc
+    : escapeHtml(p.imgSrc);
+  const safePrice = `€${p.price.toFixed(2)}`;
+  return `<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><title>${safeName}</title>
+<style>
+  :root { font-family: -apple-system, system-ui, "Segoe UI", sans-serif; }
+  body { margin: 0; padding: 16px; background: #faf6f1; color: #2b1e15; }
+  .card { display: flex; gap: 16px; align-items: center; background: #fff; border-radius: 14px; box-shadow: 0 4px 16px rgba(43,30,21,0.08); padding: 16px; max-width: 520px; }
+  .photo { width: 140px; height: 140px; object-fit: cover; border-radius: 10px; background: #ece5db; flex-shrink: 0; }
+  .meta { min-width: 0; }
+  .name { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  .price { font-size: 15px; color: #8a3a1f; font-weight: 600; margin: 0 0 8px; }
+  .desc { font-size: 13px; line-height: 1.5; margin: 0; color: #5a4a3f; }
+</style></head>
+<body>
+  <div class="card">
+    <img class="photo" src="${safeImg}" alt="${safeName}">
+    <div class="meta">
+      <p class="name">${safeName}</p>
+      <p class="price">${safePrice}</p>
+      <p class="desc">${safeDesc}</p>
+    </div>
+  </div>
+</body></html>`;
 }
 
 // POC: carica l'immagine editoriale di un prodotto da /products/editorial/<id>.webp
@@ -419,6 +483,26 @@ export function buildTools(): Tool[] {
           // Content block `image` per i client MCP che lo renderizzano inline
           // (path "MCP nativo"). Doppia copertura insieme al markdown sopra.
           content.push({ type: "image", data: img.data, mimeType: img.mimeType });
+
+          // MCP App content block: card prodotto HTML self-contained con
+          // immagine embeddata come data: URL (così niente CSP da configurare).
+          // I client che supportano MCP Apps (spec 2026-01-26) la renderizzano
+          // in un iframe sandboxed inline nella chat — il vero "image inline"
+          // che il content block `image` e il markdown URL non riescono a dare.
+          const html = buildProductCardHtml({
+            name: p.name,
+            price: p.price,
+            description: p.description,
+            imgSrc: `data:${img.mimeType};base64,${img.data}`,
+          });
+          content.push({
+            type: "resource",
+            resource: {
+              uri: `ui://bellaroma/product-card/${encodeURIComponent(p.id)}`,
+              mimeType: MCP_APP_MIME,
+              text: html,
+            },
+          });
         }
         useCartStore
           .getState()

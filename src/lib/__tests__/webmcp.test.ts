@@ -233,7 +233,7 @@ describe("WebMCP tools", () => {
     expect(res.isError).toBe(true);
   });
 
-  it("get_product appends an image content block and markdown URL when asset exists", async () => {
+  it("get_product appends image, markdown URL, and MCP App resource when asset exists", async () => {
     const pixel = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
@@ -249,19 +249,35 @@ describe("WebMCP tools", () => {
         fakeAgent,
       );
       expect(res.isError).toBeFalsy();
-      expect(res.content).toHaveLength(2);
+      expect(res.content).toHaveLength(3);
+
       const text = res.content[0] as { type: string; text: string };
       expect(text.type).toBe("text");
-      // Markdown fallback con URL assoluta verso l'asset pubblico, preceduta
-      // dall'istruzione esplicita al modello di rieccheggiarla.
       expect(text.text).toContain("INCLUDI QUESTA RIGA MARKDOWN");
       expect(text.text).toMatch(
         /!\[Caffè Americano\]\(https?:\/\/[^)]+\/products\/editorial\/americano\.webp\)/,
       );
+
       const img = res.content[1] as { type: string; data: string; mimeType: string };
       expect(img.type).toBe("image");
       expect(img.mimeType).toBe("image/webp");
       expect(img.data).toMatch(/^[A-Za-z0-9+/=]+$/);
+
+      // MCP App content block (spec 2026-01-26) per rendering inline iframe.
+      const appRes = res.content[2] as {
+        type: string;
+        resource: { uri: string; mimeType: string; text: string };
+      };
+      expect(appRes.type).toBe("resource");
+      expect(appRes.resource.uri).toBe(
+        "ui://bellaroma/product-card/americano",
+      );
+      expect(appRes.resource.mimeType).toBe("text/html;profile=mcp-app");
+      expect(appRes.resource.text).toContain("Caffè Americano");
+      expect(appRes.resource.text).toMatch(
+        /<img[^>]+src="data:image\/webp;base64,/,
+      );
+
       expect(fetchSpy).toHaveBeenCalledWith(
         "/products/editorial/americano.webp",
       );
