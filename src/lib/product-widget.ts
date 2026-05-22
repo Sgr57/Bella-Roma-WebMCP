@@ -62,9 +62,27 @@ export function buildProductWidgetHtml(p: Product): string {
   html, body { margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #f3ead7;
+    background: #ff00aa;
     color: #2b1f17;
     padding: 16px;
+    position: relative;
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+  .bw-debug-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #fff;
+    color: #ff00aa;
+    border: 1px dashed #2b1f17;
+    border-radius: 999px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: 0.02em;
+    z-index: 10;
   }
   .bw-card {
     background: #fffaf0;
@@ -140,6 +158,7 @@ export function buildProductWidgetHtml(p: Product): string {
 </style>
 </head>
 <body>
+  <div class="bw-debug-badge">&#129514; show_product_widget</div>
   <article class="bw-card">
     ${image}
     <div class="bw-body">
