@@ -6,6 +6,10 @@ import {
   type SweetnessOption,
 } from "./products";
 import { defaultOptionsFor, useCartStore } from "../store/cart";
+// Esperimento A: data:image/jpeg;base64 inline per aggirare la CSP
+// `img-src 'self' data: blob: …` degli artifact di Claude Desktop, che
+// blocca qualsiasi URL HTTPS esterno (vercel.app incluso).
+import cappuccinoDataUri from "../assets/cappuccino.jpeg?inline";
 
 const MAX_LINE_QUANTITY = 10;
 
@@ -691,13 +695,20 @@ export function buildTools(): Tool[] {
             .logToolCall("show_product_image", args, "non trovato");
           return err(`Prodotto "${a.product_id}" non trovato.`);
         }
-        // Esperimento A: testiamo JPEG su cappuccino per capire se il renderer
-        // di Claude Desktop blocchi `image/webp`. Altri prodotti hanno solo webp;
-        // se l'esperimento riesce convertiamo l'intero set.
-        const uri = `${IMAGE_BASE_URL}/${p.id}.jpeg`;
+        // Esperimento A: solo cappuccino è bundled come data:image/jpeg
+        // (CSP-friendly). Per gli altri usiamo il fallback HTTPS, che resterà
+        // broken finché non bundling-iamo anche loro.
+        const isInlined = p.id === "cappuccino";
+        const uri = isInlined
+          ? cappuccinoDataUri
+          : `${IMAGE_BASE_URL}/${p.id}.jpeg`;
         useCartStore
           .getState()
-          .logToolCall("show_product_image", args, `${p.id}.jpeg`);
+          .logToolCall(
+            "show_product_image",
+            args,
+            isInlined ? "data:image/jpeg (inline)" : `${p.id}.jpeg`,
+          );
         return {
           content: [
             { type: "text", text: `Immagine del prodotto ${p.name} (${p.id}).` },

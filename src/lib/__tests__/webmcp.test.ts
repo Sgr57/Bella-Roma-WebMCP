@@ -22,18 +22,29 @@ describe("WebMCP tools", () => {
     expect(buildTools()).toHaveLength(10);
   });
 
-  it("show_product_image returns text + resource_link to public jpeg", async () => {
+  it("show_product_image inlines cappuccino as data:image/jpeg URI", async () => {
     const res = await findTool("show_product_image").execute(
-      { product_id: "espresso" },
+      { product_id: "cappuccino" },
       fakeAgent,
     );
     expect(res.isError).toBeFalsy();
     expect(res.content).toHaveLength(2);
     expect(res.content[0]).toMatchObject({ type: "text" });
+    const link = res.content[1] as { type: string; uri: string; mimeType: string };
+    expect(link.type).toBe("resource_link");
+    expect(link.mimeType).toBe("image/jpeg");
+    expect(link.uri.startsWith("data:image/jpeg;base64,")).toBe(true);
+  });
+
+  it("show_product_image falls back to public URL for non-inlined products", async () => {
+    const res = await findTool("show_product_image").execute(
+      { product_id: "espresso" },
+      fakeAgent,
+    );
+    expect(res.isError).toBeFalsy();
     expect(res.content[1]).toMatchObject({
       type: "resource_link",
       uri: "https://bella-roma-web-mcp.vercel.app/products/editorial/espresso.jpeg",
-      mimeType: "image/jpeg",
     });
   });
 
