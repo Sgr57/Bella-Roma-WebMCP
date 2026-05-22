@@ -233,6 +233,58 @@ describe("WebMCP tools", () => {
     expect(res.isError).toBe(true);
   });
 
+  it("get_product appends an image content block and markdown URL when asset exists", async () => {
+    const pixel = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(pixel, {
+          status: 200,
+          headers: { "Content-Type": "image/webp" },
+        }),
+      );
+    try {
+      const res = await findTool("get_product").execute(
+        { product_id: "americano" },
+        fakeAgent,
+      );
+      expect(res.isError).toBeFalsy();
+      expect(res.content).toHaveLength(2);
+      const text = res.content[0] as { type: string; text: string };
+      expect(text.type).toBe("text");
+      // Markdown fallback con URL assoluta verso l'asset pubblico
+      expect(text.text).toMatch(
+        /!\[Caffè Americano\]\(https?:\/\/[^)]+\/products\/editorial\/americano\.webp\)/,
+      );
+      const img = res.content[1] as { type: string; data: string; mimeType: string };
+      expect(img.type).toBe("image");
+      expect(img.mimeType).toBe("image/webp");
+      expect(img.data).toMatch(/^[A-Za-z0-9+/=]+$/);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/products/editorial/americano.webp",
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("get_product falls back to text-only when image fetch fails", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 404 }));
+    try {
+      const res = await findTool("get_product").execute(
+        { product_id: "americano" },
+        fakeAgent,
+      );
+      expect(res.isError).toBeFalsy();
+      expect(res.content).toHaveLength(1);
+      expect(res.content[0]).toMatchObject({ type: "text" });
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it("add_to_cart accepts options and stores them on the line", async () => {
     const res = await findTool("add_to_cart").execute(
       {

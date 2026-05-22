@@ -41,8 +41,12 @@ function validateQuantity(
   return { ok: true, value: raw };
 }
 
+export type ToolContent =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string };
+
 export type ToolResult = {
-  content: Array<{ type: "text"; text: string }>;
+  content: ToolContent[];
   isError?: boolean;
 };
 
@@ -62,6 +66,35 @@ function ok(text: string): ToolResult {
 }
 function err(text: string): ToolResult {
   return { content: [{ type: "text", text }], isError: true };
+}
+
+// POC: carica l'immagine editoriale di un prodotto da /products/editorial/<id>.webp
+// e la restituisce come base64 pronta per un content block MCP `image`.
+// Ritorna null se l'asset manca o il fetch non è possibile (es. in test jsdom):
+// in quel caso il tool ricade graziosamente sul solo output testuale.
+async function loadProductImage(
+  productId: string,
+): Promise<{ data: string; mimeType: string } | null> {
+  if (typeof fetch === "undefined") return null;
+  try {
+    const url = `/products/editorial/${encodeURIComponent(productId)}.webp`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const buf = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    const CHUNK = 0x8000;
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      bin += String.fromCharCode.apply(
+        null,
+        Array.from(bytes.subarray(i, i + CHUNK)),
+      );
+    }
+    return { data: btoa(bin), mimeType: blob.type || "image/webp" };
+  } catch {
+    return null;
+  }
 }
 
 function formatAlternatives(ids?: string[]): string {
@@ -365,11 +398,33 @@ export function buildTools(): Tool[] {
             );
           }
         }
+        const img = await loadProductImage(p.id);
+        if (img) {
+          // Markdown image con URL assoluta nel testo: i client che non
+          // renderizzano il content block `image` inline (es. claude.ai, alcuni
+          // wrapper desktop) lo rieccheggiano nella risposta del modello, che
+          // viene già renderizzata come markdown. Path universalmente compatibile.
+          const origin =
+            typeof location !== "undefined" ? location.origin : "";
+          const imgUrl = `${origin}/products/editorial/${encodeURIComponent(p.id)}.webp`;
+          lines.push("");
+          lines.push(`![${p.name}](${imgUrl})`);
+        }
         const text = lines.join("\n");
+        const content: ToolContent[] = [{ type: "text", text }];
+        if (img) {
+          // Content block `image` per i client MCP che lo renderizzano inline
+          // (path "MCP nativo"). Doppia copertura insieme al markdown sopra.
+          content.push({ type: "image", data: img.data, mimeType: img.mimeType });
+        }
         useCartStore
           .getState()
-          .logToolCall("get_product", args, `${p.id} (${p.type})`);
-        return ok(text);
+          .logToolCall(
+            "get_product",
+            args,
+            `${p.id} (${p.type})${img ? " +img" : ""}`,
+          );
+        return { content };
       },
     },
     {
