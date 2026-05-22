@@ -41,10 +41,23 @@ function validateQuantity(
   return { ok: true, value: raw };
 }
 
+type TextBlock = { type: "text"; text: string };
+type ResourceLinkBlock = {
+  type: "resource_link";
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+};
+
+export type ContentBlock = TextBlock | ResourceLinkBlock;
+
 export type ToolResult = {
-  content: Array<{ type: "text"; text: string }>;
+  content: ContentBlock[];
   isError?: boolean;
 };
+
+const IMAGE_BASE_URL = "https://bella-roma-web-mcp.vercel.app/products/editorial";
 
 export type Agent = {
   requestUserInteraction?: <T>(fn: () => Promise<T> | T) => Promise<T>;
@@ -650,6 +663,50 @@ export function buildTools(): Tool[] {
           .getState()
           .logToolCall("get_cart", {}, `${s.items.length} righe`);
         return ok(summary);
+      },
+    },
+    {
+      name: "show_product_image",
+      description:
+        "Restituisce l'immagine editoriale del prodotto come MCP resource_link (URI pubblico HTTPS, WebP). Da usare quando l'utente chiede di 'vedere', 'mostrare', 'fammi vedere' un prodotto. Il client decide come renderizzare il link (inline preview vs widget). Non modifica lo stato.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          product_id: { type: "string", description: "L'id del prodotto" },
+        },
+        required: ["product_id"],
+      },
+      async execute(args) {
+        const a = args as { product_id?: unknown };
+        if (typeof a.product_id !== "string" || a.product_id.length === 0) {
+          useCartStore
+            .getState()
+            .logToolCall("show_product_image", args, "errore: product_id mancante");
+          return err("Parametro 'product_id' obbligatorio (stringa non vuota).");
+        }
+        const p = findProductCaseInsensitive(a.product_id);
+        if (!p) {
+          useCartStore
+            .getState()
+            .logToolCall("show_product_image", args, "non trovato");
+          return err(`Prodotto "${a.product_id}" non trovato.`);
+        }
+        const uri = `${IMAGE_BASE_URL}/${p.id}.webp`;
+        useCartStore
+          .getState()
+          .logToolCall("show_product_image", args, `${p.id}.webp`);
+        return {
+          content: [
+            { type: "text", text: `Immagine del prodotto ${p.name} (${p.id}).` },
+            {
+              type: "resource_link",
+              uri,
+              name: `${p.name} — immagine editoriale`,
+              description: `Foto editoriale di ${p.name}`,
+              mimeType: "image/webp",
+            },
+          ],
+        };
       },
     },
     {

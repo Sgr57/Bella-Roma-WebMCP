@@ -18,8 +18,31 @@ describe("WebMCP tools", () => {
     fakeAgent.requestUserInteraction.mockClear();
   });
 
-  it("exposes exactly 9 tools", () => {
-    expect(buildTools()).toHaveLength(9);
+  it("exposes exactly 10 tools", () => {
+    expect(buildTools()).toHaveLength(10);
+  });
+
+  it("show_product_image returns text + resource_link to public webp", async () => {
+    const res = await findTool("show_product_image").execute(
+      { product_id: "espresso" },
+      fakeAgent,
+    );
+    expect(res.isError).toBeFalsy();
+    expect(res.content).toHaveLength(2);
+    expect(res.content[0]).toMatchObject({ type: "text" });
+    expect(res.content[1]).toMatchObject({
+      type: "resource_link",
+      uri: "https://bella-roma-web-mcp.vercel.app/products/editorial/espresso.webp",
+      mimeType: "image/webp",
+    });
+  });
+
+  it("show_product_image rejects unknown product", async () => {
+    const res = await findTool("show_product_image").execute(
+      { product_id: "nonexistent" },
+      fakeAgent,
+    );
+    expect(res.isError).toBe(true);
   });
 
   it("search_products returns all products when no filter", async () => {
