@@ -22,7 +22,7 @@ describe("WebMCP tools", () => {
     expect(buildTools()).toHaveLength(10);
   });
 
-  it("show_product_image returns text + resource_link to public webp", async () => {
+  it("show_product_image returns text + resource_link to public jpeg", async () => {
     const res = await findTool("show_product_image").execute(
       { product_id: "espresso" },
       fakeAgent,
@@ -32,8 +32,8 @@ describe("WebMCP tools", () => {
     expect(res.content[0]).toMatchObject({ type: "text" });
     expect(res.content[1]).toMatchObject({
       type: "resource_link",
-      uri: "https://bella-roma-web-mcp.vercel.app/products/editorial/espresso.webp",
-      mimeType: "image/webp",
+      uri: "https://bella-roma-web-mcp.vercel.app/products/editorial/espresso.jpeg",
+      mimeType: "image/jpeg",
     });
   });
 

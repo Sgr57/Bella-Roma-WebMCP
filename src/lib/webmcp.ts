@@ -691,10 +691,13 @@ export function buildTools(): Tool[] {
             .logToolCall("show_product_image", args, "non trovato");
           return err(`Prodotto "${a.product_id}" non trovato.`);
         }
-        const uri = `${IMAGE_BASE_URL}/${p.id}.webp`;
+        // Esperimento A: testiamo JPEG su cappuccino per capire se il renderer
+        // di Claude Desktop blocchi `image/webp`. Altri prodotti hanno solo webp;
+        // se l'esperimento riesce convertiamo l'intero set.
+        const uri = `${IMAGE_BASE_URL}/${p.id}.jpeg`;
         useCartStore
           .getState()
-          .logToolCall("show_product_image", args, `${p.id}.webp`);
+          .logToolCall("show_product_image", args, `${p.id}.jpeg`);
         return {
           content: [
             { type: "text", text: `Immagine del prodotto ${p.name} (${p.id}).` },
@@ -703,7 +706,7 @@ export function buildTools(): Tool[] {
               uri,
               name: `${p.name} — immagine editoriale`,
               description: `Foto editoriale di ${p.name}`,
-              mimeType: "image/webp",
+              mimeType: "image/jpeg",
             },
           ],
         };
