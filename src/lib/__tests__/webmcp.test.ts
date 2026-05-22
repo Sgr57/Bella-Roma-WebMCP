@@ -18,8 +18,8 @@ describe("WebMCP tools", () => {
     fakeAgent.requestUserInteraction.mockClear();
   });
 
-  it("exposes exactly 10 tools", () => {
-    expect(buildTools()).toHaveLength(10);
+  it("exposes exactly 11 tools", () => {
+    expect(buildTools()).toHaveLength(11);
   });
 
   it("show_product_image returns text + resource_link to jsdelivr CDN", async () => {

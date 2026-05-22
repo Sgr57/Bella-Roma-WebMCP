@@ -32,10 +32,15 @@ type FakeClient = {
 };
 
 function serializeTool(t: Tool) {
+  // _meta is forwarded so MCP Apps fields (e.g. _meta.ui.resourceUri) on the
+  // tool descriptor reach the relay/MCP client. The polyfill stores _meta but
+  // does not expose it via getToolInfos(); our local-relay path is independent
+  // of that, so it can pass it through unchanged.
   return {
     name: t.name,
     description: t.description,
     inputSchema: t.inputSchema,
+    ...(t._meta ? { _meta: t._meta } : {}),
   };
 }
 

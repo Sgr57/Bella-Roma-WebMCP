@@ -6,6 +6,7 @@ import {
   type SweetnessOption,
 } from "./products";
 import { defaultOptionsFor, useCartStore } from "../store/cart";
+import { buildProductWidgetHtml, widgetUri } from "./product-widget";
 
 const MAX_LINE_QUANTITY = 10;
 
@@ -49,8 +50,16 @@ type ResourceLinkBlock = {
   description?: string;
   mimeType?: string;
 };
+type EmbeddedResourceBlock = {
+  type: "resource";
+  resource: {
+    uri: string;
+    mimeType?: string;
+    text: string;
+  };
+};
 
-export type ContentBlock = TextBlock | ResourceLinkBlock;
+export type ContentBlock = TextBlock | ResourceLinkBlock | EmbeddedResourceBlock;
 
 export type ToolResult = {
   content: ContentBlock[];
@@ -70,6 +79,10 @@ export type Tool = {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  // MCP Apps spec hint: link a tool to a UI template resource URI. We attach
+  // it here so the polyfill stores it on the tool record; the local relay
+  // forwards it via the tools/list payload (see relay-client.ts).
+  _meta?: { ui?: { resourceUri?: string } };
   execute: (args: Record<string, unknown>, agent?: Agent) => Promise<ToolResult>;
 };
 
@@ -707,6 +720,58 @@ export function buildTools(): Tool[] {
               name: `${p.name} — immagine editoriale`,
               description: `Foto editoriale di ${p.name}`,
               mimeType: "image/webp",
+            },
+          ],
+        };
+      },
+    },
+    {
+      name: "show_product_widget",
+      description:
+        "Restituisce una card prodotto come MCP App: un blocco resource embedded con HTML inline (mimeType text/html;profile=mcp-app), uri ui://bellaroma/product-card/<id>. Probe: testa se Claude Desktop renderizza widget inline senza esporre resources/list/read. Per ora l'immagine inline è disponibile solo per cappuccino; gli altri prodotti ricadono su un placeholder CSS.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          product_id: { type: "string", description: "L'id del prodotto" },
+        },
+        required: ["product_id"],
+      },
+      _meta: {
+        ui: {
+          // Template URI shared by all product cards; runtime substitutes <id>.
+          resourceUri: "ui://bellaroma/product-card/{product_id}",
+        },
+      },
+      async execute(args) {
+        const a = args as { product_id?: unknown };
+        if (typeof a.product_id !== "string" || a.product_id.length === 0) {
+          useCartStore
+            .getState()
+            .logToolCall("show_product_widget", args, "errore: product_id mancante");
+          return err("Parametro 'product_id' obbligatorio (stringa non vuota).");
+        }
+        const p = findProductCaseInsensitive(a.product_id);
+        if (!p) {
+          useCartStore
+            .getState()
+            .logToolCall("show_product_widget", args, "non trovato");
+          return err(`Prodotto "${a.product_id}" non trovato.`);
+        }
+        const html = buildProductWidgetHtml(p);
+        const uri = widgetUri(p.id);
+        useCartStore
+          .getState()
+          .logToolCall("show_product_widget", args, `${p.id} widget (${html.length}B)`);
+        return {
+          content: [
+            { type: "text", text: `Scheda prodotto ${p.name} (${p.id}).` },
+            {
+              type: "resource",
+              resource: {
+                uri,
+                mimeType: "text/html;profile=mcp-app",
+                text: html,
+              },
             },
           ],
         };
