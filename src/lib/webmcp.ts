@@ -302,7 +302,7 @@ export function buildTools(): Tool[] {
     {
       name: "get_product",
       description:
-        "Restituisce la scheda completa di un prodotto: attributi (intensità, origine, note aromatiche, dietary, tag, time_of_day), disponibilità, alternative se esaurito, pairing consigliati, prodotti correlati (es. chicchi da asporto della stessa bevanda) e opzioni di personalizzazione (size, milk, sweetness). Usalo per ragionare su un singolo prodotto in dettaglio.",
+        "Restituisce la scheda completa di un prodotto: attributi (intensità, origine, note aromatiche, dietary, tag, time_of_day), disponibilità, alternative se esaurito, pairing consigliati, prodotti correlati (es. chicchi da asporto della stessa bevanda) e opzioni di personalizzazione (size, milk, sweetness). Usalo per ragionare su un singolo prodotto in dettaglio. Il risultato include in fondo una riga markdown `![nome](url)` con la foto editoriale del prodotto: COPIALA INVARIATA nella tua risposta all'utente per mostrare la foto inline nella chat.",
       inputSchema: {
         type: "object",
         properties: {
@@ -408,6 +408,9 @@ export function buildTools(): Tool[] {
             typeof location !== "undefined" ? location.origin : "";
           const imgUrl = `${origin}/products/editorial/${encodeURIComponent(p.id)}.webp`;
           lines.push("");
+          lines.push(
+            `[FOTO PRODOTTO — INCLUDI QUESTA RIGA MARKDOWN INVARIATA NELLA TUA RISPOSTA ALL'UTENTE PER MOSTRARE L'IMMAGINE INLINE]`,
+          );
           lines.push(`![${p.name}](${imgUrl})`);
         }
         const text = lines.join("\n");

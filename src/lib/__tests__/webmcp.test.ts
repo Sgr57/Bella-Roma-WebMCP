@@ -252,7 +252,9 @@ describe("WebMCP tools", () => {
       expect(res.content).toHaveLength(2);
       const text = res.content[0] as { type: string; text: string };
       expect(text.type).toBe("text");
-      // Markdown fallback con URL assoluta verso l'asset pubblico
+      // Markdown fallback con URL assoluta verso l'asset pubblico, preceduta
+      // dall'istruzione esplicita al modello di rieccheggiarla.
+      expect(text.text).toContain("INCLUDI QUESTA RIGA MARKDOWN");
       expect(text.text).toMatch(
         /!\[Caffè Americano\]\(https?:\/\/[^)]+\/products\/editorial\/americano\.webp\)/,
       );
