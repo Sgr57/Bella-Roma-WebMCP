@@ -2,7 +2,7 @@
 
 > **Proof-of-Concept**: una vetrina e‑commerce *agent-ready*. Un agente AI (Claude Desktop) ordina caffè, applica coupon e fa checkout su una pagina React **senza** vedere il DOM, senza scraper, senza pilotare il cursore — chiama direttamente i tool che la pagina espone.
 
-🌐 **Demo live**: <https://bella-roma-web-mcp.vercel.app/> — apri il link, attiva il toggle `Relay · Off → CDN` in header e collega Claude Desktop (vedi Step 2 più sotto). Niente da installare lato sito.
+🌐 **Demo live**: <https://bella-roma-web-mcp.vercel.app/> — apri il link e collega Claude Desktop (vedi Step 2 più sotto). Il relay parte già attivo: niente toggle da cliccare, niente da installare lato sito.
 
 Single-page React app che simula la torrefazione fittizia **Bella Roma Coffee** ed espone le sue azioni come **10 tool WebMCP** invocabili da un agente AI nel browser tramite `navigator.modelContext`. Pensata per una demo da 60 secondi davanti a stakeholder non tecnici, ma costruita su standard reali (W3C Draft Community Group Report, febbraio 2026).
 
@@ -51,7 +51,7 @@ npm install   # solo la prima volta
 npm run dev
 ```
 
-Apri **http://localhost:5173** nel browser. Vedrai la home di Bella Roma Coffee con catalogo, carrello a destra e — in alto a destra nella utility strip dell'header — due **pill di stato** (`WebMCP · …` e `Relay · Off`).
+Apri **http://localhost:5173** nel browser. Vedrai la home di Bella Roma Coffee con catalogo, carrello a destra e — in alto a destra nella utility strip dell'header — due **pill di stato** (`WebMCP · …` e `Relay · …`). Il relay è attivo per default; se vuoi disabilitarlo (es. per ispezionare la pagina senza bridge) clicca la pill `Relay` o aggiungi `?relay=false` all'URL.
 
 ### Step 2 — Installa il relay MCP in Claude Desktop
 
@@ -87,14 +87,14 @@ lsof -nP -i :9333
 
 Se non vedi nulla → vai a **Troubleshooting** in fondo.
 
-### Step 3 — Attiva il bridge nella pagina
+### Step 3 — Verifica il bridge nella pagina
 
-Torna su **http://localhost:5173** e clicca la pill **`Relay · Off`** in alto a destra. La pagina si ricarica con `?relay=true` nell'URL. La pill diventa:
+Torna su **http://localhost:5173**. Il bridge parte da solo al caricamento. La pill **Relay** in alto a destra deve mostrare:
 
 - **`Relay · Live`** (verde) → sei su Chrome Canary con WebMCP nativo
 - **`Relay · CDN`** (verde) → sei su Chrome stabile, parte il polyfill
 
-Se vedi giallo/ambra (`connecting`, `closed`, `No API`) → **Troubleshooting**.
+Se vedi giallo/ambra (`connecting`, `closed`, `No API`) → **Troubleshooting**. Per disattivare il relay (raro, es. per debug DOM puro) clicca la pill: si ricarica con `?relay=false` e diventa `Relay · Off`.
 
 ### Step 4 — Verifica che Claude veda i tool
 
@@ -156,7 +156,7 @@ Tre segnali ti dicono che tutto funziona:
 
 ## Riferimento tecnico: i due bridge
 
-Due strade, **entrambe affidabili**, entrambe selezionabili dallo **stesso toggle pill in header** (`Relay · Off ⇄ Relay · Live/CDN`) o dal query param `?relay=true`. La pagina rileva il browser e instrada da sola al bridge giusto.
+Due strade, **entrambe affidabili**, entrambe selezionabili dallo **stesso toggle pill in header** (`Relay · Off ⇄ Relay · Live/CDN`) o dal query param `?relay=false` (default: attivo). La pagina rileva il browser e instrada da sola al bridge giusto.
 
 | Browser | Bridge selezionato | Estensione? | Polyfill? |
 |---|---|---|---|
@@ -181,7 +181,7 @@ La utility strip (la striscia navy sotto la promo bar) mostra **due pill** affia
 | **Relay · CDN** | 🟢 verde | Path compat, embed `@mcp-b/webmcp-local-relay` caricato da jsDelivr |
 | **Relay · No API** | 🟡 ambra | Relay richiesto ma nessuna API WebMCP disponibile |
 
-La pill **Relay** è anche un **toggle**: cliccarla aggiunge/rimuove `?relay=true` e ricarica la pagina. Accanto, il bottone **Reset demo** svuota carrello, coupon e Tool Activity Log.
+La pill **Relay** è anche un **toggle**: cliccarla aggiunge/rimuove `?relay=false` e ricarica la pagina (default = attivo). Accanto, il bottone **Reset demo** svuota carrello, coupon e Tool Activity Log.
 
 Combo attese durante la demo:
 - **Chrome Canary EPP**: `WebMCP · Native` + `Relay · Live`.
@@ -262,7 +262,7 @@ Test su `store/cart`, `lib/products`, `lib/webmcp` (catalogo, store, tool adapte
 - **`src/lib/prompts.ts`** è la lista condivisa dei 7 prompt suggeriti (`TOP_PROMPTS`) e dei 3 selezionati per l'empty state del carrello (`CART_EMPTY_PROMPT_IDS`).
 - **`src/lib/webmcp.ts`** è l'**adapter** tra l'API WebMCP e lo store. Espone `buildTools()` (10 tool) e `registerTools()` che è **dual-API**: usa `navigator.modelContext.registerTool(t)` (W3C spec, nativo) oppure `provideContext({tools})` (polyfill `@mcp-b/global`) a seconda di chi è presente. Idempotente (guard `registered` + dedup via `getTools()` quando disponibile).
 - **`src/lib/polyfill.ts`** rileva la modalità (`native` / `polyfill` / `unavailable`) e carica `@mcp-b/global` solo se serve. Distingue native vs polyfill anche quando entrambi appaiono presenti, leggendo `constructor.name` e l'assenza di `provideContext`.
-- **`src/lib/relay.ts`** (orchestratore) — legge il flag `?relay=true`, chiama `connectRelay(mode)` che instrada al bridge giusto:
+- **`src/lib/relay.ts`** (orchestratore) — il relay è attivo di default (disabilitabile con `?relay=false`), chiama `connectRelay(mode)` che instrada al bridge giusto:
   - `mode === "native"` → import dinamico di `relay-client.ts` (vedi sotto).
   - `mode === "polyfill"` → inietta lo `<script>` dell'embed CDN (`@mcp-b/webmcp-local-relay/dist/browser/embed.js`).
 - **`src/lib/relay-client.ts`** (~165 LoC) — implementa il protocollo del relay direttamente: `WebSocket` verso `127.0.0.1:9333`, handshake `hello` + `tools/list`, gestione `invoke/result`, `ping/pong`, reconnect con backoff (2s → 30s). Nessuna dipendenza da `executeTool` non-spec di Chrome: dispatcha localmente chiamando `tool.execute(args, fakeClient)`. Espone `onRelayState(...)` per l'indicatore in Header.
@@ -290,7 +290,7 @@ Vite 6 · React 18 · TypeScript 5 · Tailwind CSS 3 · Zustand · Framer Motion
 ## Troubleshooting
 
 **"There are no connected WebMCP sources" in Claude Desktop**
-- Verifica che la pill **Relay** in header non sia su `Off` — deve mostrare `Live` (nativo) o `CDN` (polyfill). In alternativa controlla che `?relay=true` sia nell'URL.
+- Verifica che la pill **Relay** in header non sia su `Off` — deve mostrare `Live` (nativo) o `CDN` (polyfill). Se l'URL contiene `?relay=false`, rimuovilo.
 - Riavvia Claude Desktop completamente dopo aver modificato `claude_desktop_config.json` (⌘Q, non basta chiudere la finestra).
 - Verifica che il relay sia in ascolto: `lsof -nP -i :9333`. Devi vedere `node ... LISTEN` e una riga `Google ... ESTABLISHED` per ogni tab connessa.
 - Ricarica la tab **dopo** che Claude Desktop è ripartito (la connessione WebSocket viene aperta al `load`).
@@ -308,7 +308,7 @@ Vite 6 · React 18 · TypeScript 5 · Tailwind CSS 3 · Zustand · Framer Motion
 - Su Canary, controlla che il flag *Experimental Web Platform features* (o l'EPP WebMCP) sia attivo in `chrome://flags`.
 
 **La pill mostra `Relay · No API`**
-- Hai attivato il toggle relay (`?relay=true`) ma né l'API nativa né il polyfill sono caricati. Risolvi prima il caso `WebMCP · Offline` qui sopra: il relay senza API esposta non ha tool da pubblicare.
+- Il relay è attivo (default o `?relay=true`) ma né l'API nativa né il polyfill sono caricati. Risolvi prima il caso `WebMCP · Offline` qui sopra: il relay senza API esposta non ha tool da pubblicare.
 
 **Il modale di checkout non appare quando l'agente chiama `checkout`**
 - Verifica che `CheckoutModal` sia mounted (è in `App.tsx`). Senza modale registrato, `requestCheckoutConfirmation` fa fallback a `window.confirm`.
