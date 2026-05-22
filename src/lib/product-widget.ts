@@ -2,17 +2,25 @@
 //
 // Goal: return an MCP App embedded resource (text/html;profile=mcp-app)
 // inline in the tool result, bypassing resources/list and resources/read.
-// The cappuccino editorial image is embedded as a base64 data: URI so the
-// iframe CSP (img-src 'self' data:) does not need network access.
-
+//
+// Probe B'': previously cappuccino was inlined as a base64 data: URI (~22KB
+// HTML payload). We now reference the jsdelivr CDN URL instead (~3KB payload)
+// to isolate whether the embedded-resource block was rejected for size, vs.
+// the mechanism itself. Note: the default MCP App iframe CSP is
+// `img-src 'self' data:`, so jsdelivr may be blocked by CSP — that produces
+// a separate, useful signal (magenta bg + badge + broken image icon).
 import type { Product } from "./products";
-import cappuccinoDataUri from "../assets/cappuccino.webp?inline";
 
-// Map of product id -> embedded data URI for images. Only cappuccino is
-// inlined to keep the bundle small; other products fall back to a CSS-only
-// placeholder so the widget still renders end-to-end.
-const PRODUCT_IMAGE_DATA: Record<string, string> = {
-  cappuccino: cappuccinoDataUri,
+// CDN base for editorial product images. Same host the rest of the app uses
+// (see IMAGE_BASE_URL in src/lib/webmcp.ts).
+const PRODUCT_IMAGE_CDN_BASE =
+  "https://cdn.jsdelivr.net/gh/Sgr57/Bella-Roma-WebMCP@main/public/products/editorial";
+
+// Map of product id -> CDN filename. Only cappuccino is wired in for this
+// probe; other products fall back to a CSS-only placeholder so the widget
+// still renders end-to-end.
+const PRODUCT_IMAGE_FILE: Record<string, string> = {
+  cappuccino: "cappuccino.webp",
 };
 
 function escapeHtml(s: string): string {
@@ -25,11 +33,12 @@ function escapeHtml(s: string): string {
 }
 
 function renderImageSection(p: Product): string {
-  const inline = PRODUCT_IMAGE_DATA[p.id];
-  if (inline) {
-    return `<img class="bw-img" src="${inline}" alt="${escapeHtml(p.name)}" />`;
+  const file = PRODUCT_IMAGE_FILE[p.id];
+  if (file) {
+    const src = `${PRODUCT_IMAGE_CDN_BASE}/${file}`;
+    return `<img class="bw-img" src="${src}" alt="${escapeHtml(p.name)}" />`;
   }
-  // CSS-only fallback for products without inlined image: monogram on warm bg.
+  // CSS-only fallback for products without a CDN image: monogram on warm bg.
   const monogram = escapeHtml(p.emoji || p.name.slice(0, 1));
   return `<div class="bw-img bw-img--placeholder">${monogram}</div>`;
 }
