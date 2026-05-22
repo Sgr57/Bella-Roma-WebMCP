@@ -231,7 +231,7 @@ Tutto il routing tra i due bridge è in `src/lib/relay.ts` → `connectRelay(mod
 |---|---|---|
 | `search_products` | Filtra catalogo: categoria, tipo (drink/food/beans/capsule/milk_option), prezzo max, tag, dietary, note aromatiche, origine, intensità min/max, momento della giornata, in-stock-only, testo libero | no |
 | `get_product` | Scheda completa di un prodotto: attributi, disponibilità, alternative se esaurito, pairing, prodotti correlati cross-modal, opzioni di personalizzazione | no |
-| `show_product_image` | Ritorna un `resource_link` MCP con la foto editoriale del prodotto (URI su `cdn.jsdelivr.net`, whitelist della CSP `img-src` di Claude Desktop). Il client la rende inline nella card prodotto | no |
+| `show_product_image` | Ritorna un `resource_link` MCP con la foto editoriale del prodotto (URI su `cdn.jsdelivr.net`, whitelist della CSP `img-src` degli iframe MCP App). Si renderizza inline nella card prodotto su **claude.ai web** e **Claude Desktop tab Cowork**; su Desktop tab **Chat** collassa in widget "Show Image" (limite UI lato client) | no |
 | `add_to_cart` | Aggiunge un prodotto al carrello con `options` (size, milk, sweetness). Ritorna errore strutturato con `alternatives[]` se il prodotto o l'opzione latte richiesta è ESAURITA | no |
 | `remove_from_cart` | Rimuove riga (passa `options` per disambiguare righe stesso prodotto con varianti diverse) | no |
 | `apply_coupon` | Applica `BENVENUTO` (-10%) o `STUDENTI` (-20% max €5). Sovrascrive un coupon già attivo | no |
@@ -240,7 +240,7 @@ Tutto il routing tra i due bridge è in `src/lib/relay.ts` → `connectRelay(mod
 | `get_cart` | Ritorna stato carrello (incluse opzioni per riga e prezzi con modifier) | no |
 | `checkout` | Conferma ordine | **sì** (modale `requestUserInteraction`) |
 
-Le immagini di prodotto vengono servite da questo stesso repo via `cdn.jsdelivr.net` (path `public/products/editorial/`): il dominio Vercel principale non è nella CSP `img-src` degli iframe MCP App di Claude Desktop, jsdelivr sì.
+Le immagini di prodotto sono servite da questo stesso repo via jsdelivr — `https://cdn.jsdelivr.net/gh/Sgr57/Bella-Roma-WebMCP@main/public/products/editorial/<id>.webp`. Il dominio Vercel principale non è nella CSP `img-src` degli iframe MCP App, `cdn.jsdelivr.net` sì. Per questo il repo è pubblico: jsdelivr serve solo asset da GitHub raw pubblici. Rendering inline verificato empiricamente su Claude Desktop tab Cowork (2026-05-22).
 
 ### Schema prodotto
 
