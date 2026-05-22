@@ -6,10 +6,6 @@ import {
   type SweetnessOption,
 } from "./products";
 import { defaultOptionsFor, useCartStore } from "../store/cart";
-// Esperimento A: data:image/jpeg;base64 inline per aggirare la CSP
-// `img-src 'self' data: blob: …` degli artifact di Claude Desktop, che
-// blocca qualsiasi URL HTTPS esterno (vercel.app incluso).
-import cappuccinoDataUri from "../assets/cappuccino.jpeg?inline";
 
 const MAX_LINE_QUANTITY = 10;
 
@@ -61,7 +57,11 @@ export type ToolResult = {
   isError?: boolean;
 };
 
-const IMAGE_BASE_URL = "https://bella-roma-web-mcp.vercel.app/products/editorial";
+// jsdelivr mirroring del repo pubblico Sgr57/bella-roma-assets. cdn.jsdelivr.net
+// è whitelisted nella CSP `img-src` degli iframe MCP Apps di Claude Desktop,
+// mentre il dominio Vercel principale è bloccato.
+const IMAGE_BASE_URL =
+  "https://cdn.jsdelivr.net/gh/Sgr57/bella-roma-assets@main/products/editorial";
 
 export type Agent = {
   requestUserInteraction?: <T>(fn: () => Promise<T> | T) => Promise<T>;
@@ -695,20 +695,13 @@ export function buildTools(): Tool[] {
             .logToolCall("show_product_image", args, "non trovato");
           return err(`Prodotto "${a.product_id}" non trovato.`);
         }
-        // Esperimento A: solo cappuccino è bundled come data:image/jpeg
-        // (CSP-friendly). Per gli altri usiamo il fallback HTTPS, che resterà
-        // broken finché non bundling-iamo anche loro.
-        const isInlined = p.id === "cappuccino";
-        const uri = isInlined
-          ? cappuccinoDataUri
-          : `${IMAGE_BASE_URL}/${p.id}.jpeg`;
+        // Tutti i prodotti hanno .webp nel repo asset; cappuccino è anche
+        // disponibile come .jpeg per eventuale comparazione mimeType.
+        const ext = "webp";
+        const uri = `${IMAGE_BASE_URL}/${p.id}.${ext}`;
         useCartStore
           .getState()
-          .logToolCall(
-            "show_product_image",
-            args,
-            isInlined ? "data:image/jpeg (inline)" : `${p.id}.jpeg`,
-          );
+          .logToolCall("show_product_image", args, `${p.id}.${ext}`);
         return {
           content: [
             { type: "text", text: `Immagine del prodotto ${p.name} (${p.id}).` },
@@ -717,7 +710,7 @@ export function buildTools(): Tool[] {
               uri,
               name: `${p.name} — immagine editoriale`,
               description: `Foto editoriale di ${p.name}`,
-              mimeType: "image/jpeg",
+              mimeType: `image/${ext}`,
             },
           ],
         };
