@@ -72,7 +72,7 @@ export function buildProductWidgetHtml(p: Product): string {
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: #ff00aa;
-    color: #2b1f17;
+    color: #0044ff;
     padding: 16px;
     position: relative;
     min-height: 100vh;
@@ -83,8 +83,8 @@ export function buildProductWidgetHtml(p: Product): string {
     top: 8px;
     right: 8px;
     background: #fff;
-    color: #ff00aa;
-    border: 1px dashed #2b1f17;
+    color: #0088ff;
+    border: 1px dashed #0044ff;
     border-radius: 999px;
     padding: 3px 8px;
     font-size: 11px;
@@ -122,17 +122,17 @@ export function buildProductWidgetHtml(p: Product): string {
     font-size: 22px;
     font-weight: 600;
     margin: 0 0 6px;
-    color: #3a2614;
+    color: #0044ff;
   }
   .bw-desc {
     font-size: 14px;
     line-height: 1.45;
     margin: 0 0 10px;
-    color: #4a3a2a;
+    color: #0044ff;
   }
   .bw-meta {
     font-size: 12px;
-    color: #7a5d3e;
+    color: #0044ff;
     letter-spacing: 0.02em;
     margin: 0 0 12px;
     text-transform: uppercase;
@@ -148,13 +148,13 @@ export function buildProductWidgetHtml(p: Product): string {
     font-family: Georgia, "Times New Roman", serif;
     font-size: 20px;
     font-weight: 600;
-    color: #3a2614;
+    color: #0044ff;
   }
   .bw-cta {
     appearance: none;
     border: 0;
     background: #5b3a1d;
-    color: #fff7e6;
+    color: #0044ff;
     font: inherit;
     font-size: 13px;
     font-weight: 600;
