@@ -8,13 +8,17 @@ export type RelayVariant = "native-ws" | "polyfill-embed" | "off";
 
 export function isRelayEnabled(): boolean {
   if (typeof window === "undefined") return false;
-  return new URLSearchParams(window.location.search).get("relay") === "true";
+  // Default-on: il relay è attivo a meno che l'utente non passi
+  // esplicitamente `?relay=false` per disabilitarlo.
+  return (
+    new URLSearchParams(window.location.search).get("relay") !== "false"
+  );
 }
 
 export function setRelayEnabled(enabled: boolean): void {
   const url = new URL(window.location.href);
-  if (enabled) url.searchParams.set("relay", "true");
-  else url.searchParams.delete("relay");
+  if (enabled) url.searchParams.delete("relay");
+  else url.searchParams.set("relay", "false");
   window.location.href = url.toString();
 }
 
