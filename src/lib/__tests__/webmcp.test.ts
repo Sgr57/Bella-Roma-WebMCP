@@ -32,7 +32,7 @@ describe("WebMCP tools", () => {
     expect(res.content[0]).toMatchObject({ type: "text" });
     expect(res.content[1]).toMatchObject({
       type: "resource_link",
-      uri: "https://cdn.jsdelivr.net/gh/Sgr57/bella-roma-assets@main/products/editorial/cappuccino.webp",
+      uri: "https://cdn.jsdelivr.net/gh/Sgr57/Bella-Roma-WebMCP@main/public/products/editorial/cappuccino.webp",
       mimeType: "image/webp",
     });
   });

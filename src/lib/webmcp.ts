@@ -58,9 +58,9 @@ export type ToolResult = {
 };
 
 // cdn.jsdelivr.net è nella CSP img-src degli iframe MCP App di Claude Desktop;
-// il dominio Vercel non lo è. Asset pubblici: github.com/Sgr57/bella-roma-assets.
+// il dominio Vercel non lo è. Asset serviti da questo repo via jsdelivr.
 const IMAGE_BASE_URL =
-  "https://cdn.jsdelivr.net/gh/Sgr57/bella-roma-assets@main/products/editorial";
+  "https://cdn.jsdelivr.net/gh/Sgr57/Bella-Roma-WebMCP@main/public/products/editorial";
 
 export type Agent = {
   requestUserInteraction?: <T>(fn: () => Promise<T> | T) => Promise<T>;

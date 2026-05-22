@@ -240,7 +240,7 @@ Tutto il routing tra i due bridge è in `src/lib/relay.ts` → `connectRelay(mod
 | `get_cart` | Ritorna stato carrello (incluse opzioni per riga e prezzi con modifier) | no |
 | `checkout` | Conferma ordine | **sì** (modale `requestUserInteraction`) |
 
-Le immagini di prodotto vengono servite dal repo pubblico [`Sgr57/bella-roma-assets`](https://github.com/Sgr57/bella-roma-assets) via `cdn.jsdelivr.net`: il dominio Vercel principale non è nella CSP `img-src` degli iframe MCP App di Claude Desktop, jsdelivr sì.
+Le immagini di prodotto vengono servite da questo stesso repo via `cdn.jsdelivr.net` (path `public/products/editorial/`): il dominio Vercel principale non è nella CSP `img-src` degli iframe MCP App di Claude Desktop, jsdelivr sì.
 
 ### Schema prodotto
 
