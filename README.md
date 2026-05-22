@@ -4,7 +4,7 @@
 
 🌐 **Demo live**: <https://bella-roma-web-mcp.vercel.app/> — apri il link, attiva il toggle `Relay · Off → CDN` in header e collega Claude Desktop (vedi Step 2 più sotto). Niente da installare lato sito.
 
-Single-page React app che simula la torrefazione fittizia **Bella Roma Coffee** ed espone le sue azioni come **9 tool WebMCP** invocabili da un agente AI nel browser tramite `navigator.modelContext`. Pensata per una demo da 60 secondi davanti a stakeholder non tecnici, ma costruita su standard reali (W3C Draft Community Group Report, febbraio 2026).
+Single-page React app che simula la torrefazione fittizia **Bella Roma Coffee** ed espone le sue azioni come **10 tool WebMCP** invocabili da un agente AI nel browser tramite `navigator.modelContext`. Pensata per una demo da 60 secondi davanti a stakeholder non tecnici, ma costruita su standard reali (W3C Draft Community Group Report, febbraio 2026).
 
 Il catalogo include 27 prodotti (13 drink, 4 food, 3 chicchi take-home, 2 capsule, 5 opzioni latte di cui una "esaurita" per dimostrare la sostituzione). Ogni prodotto è annotato con intensità, origine, note aromatiche, dietary, tag, pairing, prodotti correlati e opzioni di personalizzazione (size / latte / zucchero). Il set di tool resta volutamente minimale: l'agente compone primitive piccole invece di chiamare endpoint di alto livello.
 
@@ -102,7 +102,7 @@ Apri **Claude Desktop** e scrivi:
 
 > *Mostrami le sorgenti WebMCP collegate.*
 
-Claude deve elencare la tab **"Bella Roma Coffee"** con i suoi **9 tool** (`search_products`, `get_product`, `add_to_cart`, `remove_from_cart`, `apply_coupon`, `remove_coupon`, `clear_cart`, `get_cart`, `checkout`).
+Claude deve elencare la tab **"Bella Roma Coffee"** con i suoi **10 tool** (`search_products`, `get_product`, `show_product_image`, `add_to_cart`, `remove_from_cart`, `apply_coupon`, `remove_coupon`, `clear_cart`, `get_cart`, `checkout`).
 
 Se Claude dice "nessuna sorgente collegata", ricontrolla Step 2 e Step 3.
 
@@ -225,17 +225,22 @@ Tutto il routing tra i due bridge è in `src/lib/relay.ts` → `connectRelay(mod
 
 ## Tool esposti
 
-7 tool totali. Filosofia di design: **primitive piccole, agente compositore.** I tre tool "core" sono ricchi; ogni scenario complesso (bundle, pairing, upsell, sostituzione) viene composto dall'agente combinandoli, senza endpoint di alto livello.
+10 tool totali. Filosofia di design: **primitive piccole, agente compositore.** I tool "core" (`search_products`, `get_product`, `add_to_cart`) sono ricchi; ogni scenario complesso (bundle, pairing, upsell, sostituzione) viene composto dall'agente combinandoli, senza endpoint di alto livello.
 
 | Tool | Cosa fa | Conferma utente |
 |---|---|---|
 | `search_products` | Filtra catalogo: categoria, tipo (drink/food/beans/capsule/milk_option), prezzo max, tag, dietary, note aromatiche, origine, intensità min/max, momento della giornata, in-stock-only, testo libero | no |
 | `get_product` | Scheda completa di un prodotto: attributi, disponibilità, alternative se esaurito, pairing, prodotti correlati cross-modal, opzioni di personalizzazione | no |
+| `show_product_image` | Ritorna un `resource_link` MCP con la foto editoriale del prodotto (URI su `cdn.jsdelivr.net`, whitelist della CSP `img-src` di Claude Desktop). Il client la rende inline nella card prodotto | no |
 | `add_to_cart` | Aggiunge un prodotto al carrello con `options` (size, milk, sweetness). Ritorna errore strutturato con `alternatives[]` se il prodotto o l'opzione latte richiesta è ESAURITA | no |
-| `remove_from_cart` | Rimuove riga | no |
-| `apply_coupon` | Applica `BENVENUTO` (-10%) o `STUDENTI` (-20% max €5) | no |
+| `remove_from_cart` | Rimuove riga (passa `options` per disambiguare righe stesso prodotto con varianti diverse) | no |
+| `apply_coupon` | Applica `BENVENUTO` (-10%) o `STUDENTI` (-20% max €5). Sovrascrive un coupon già attivo | no |
+| `remove_coupon` | Rimuove il coupon corrente lasciando il carrello intatto | no |
+| `clear_cart` | Svuota carrello + rimuove coupon in un'unica chiamata (reset conversazionale) | no |
 | `get_cart` | Ritorna stato carrello (incluse opzioni per riga e prezzi con modifier) | no |
 | `checkout` | Conferma ordine | **sì** (modale `requestUserInteraction`) |
+
+Le immagini di prodotto vengono servite dal repo pubblico [`Sgr57/bella-roma-assets`](https://github.com/Sgr57/bella-roma-assets) via `cdn.jsdelivr.net`: il dominio Vercel principale non è nella CSP `img-src` degli iframe MCP App di Claude Desktop, jsdelivr sì.
 
 ### Schema prodotto
 
@@ -255,7 +260,7 @@ Test su `store/cart`, `lib/products`, `lib/webmcp` (catalogo, store, tool adapte
 - **Zustand** (`src/store/cart.ts`) è la *single source of truth* per carrello, coupon applicato e log delle invocazioni dei tool. Le righe del carrello supportano `options` (size, milk, sweetness): righe con options identiche si fondono; righe con options diverse restano distinte. `lineUnitPrice(item)` calcola il prezzo includendo il `size.price_modifier` e il `price` del milk option scelto come modificatore.
 - **`src/lib/products.ts`** ospita lo schema `Product` esteso e il catalogo a 27 entry (5 tipi: drink, food, beans, capsule, milk_option). Helper `getProductById` e `getProductsByType`.
 - **`src/lib/prompts.ts`** è la lista condivisa dei 7 prompt suggeriti (`TOP_PROMPTS`) e dei 3 selezionati per l'empty state del carrello (`CART_EMPTY_PROMPT_IDS`).
-- **`src/lib/webmcp.ts`** è l'**adapter** tra l'API WebMCP e lo store. Espone `buildTools()` (7 tool) e `registerTools()` che è **dual-API**: usa `navigator.modelContext.registerTool(t)` (W3C spec, nativo) oppure `provideContext({tools})` (polyfill `@mcp-b/global`) a seconda di chi è presente. Idempotente (guard `registered` + dedup via `getTools()` quando disponibile).
+- **`src/lib/webmcp.ts`** è l'**adapter** tra l'API WebMCP e lo store. Espone `buildTools()` (10 tool) e `registerTools()` che è **dual-API**: usa `navigator.modelContext.registerTool(t)` (W3C spec, nativo) oppure `provideContext({tools})` (polyfill `@mcp-b/global`) a seconda di chi è presente. Idempotente (guard `registered` + dedup via `getTools()` quando disponibile).
 - **`src/lib/polyfill.ts`** rileva la modalità (`native` / `polyfill` / `unavailable`) e carica `@mcp-b/global` solo se serve. Distingue native vs polyfill anche quando entrambi appaiono presenti, leggendo `constructor.name` e l'assenza di `provideContext`.
 - **`src/lib/relay.ts`** (orchestratore) — legge il flag `?relay=true`, chiama `connectRelay(mode)` che instrada al bridge giusto:
   - `mode === "native"` → import dinamico di `relay-client.ts` (vedi sotto).

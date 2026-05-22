@@ -57,9 +57,8 @@ export type ToolResult = {
   isError?: boolean;
 };
 
-// jsdelivr mirroring del repo pubblico Sgr57/bella-roma-assets. cdn.jsdelivr.net
-// è whitelisted nella CSP `img-src` degli iframe MCP Apps di Claude Desktop,
-// mentre il dominio Vercel principale è bloccato.
+// cdn.jsdelivr.net è nella CSP img-src degli iframe MCP App di Claude Desktop;
+// il dominio Vercel non lo è. Asset pubblici: github.com/Sgr57/bella-roma-assets.
 const IMAGE_BASE_URL =
   "https://cdn.jsdelivr.net/gh/Sgr57/bella-roma-assets@main/products/editorial";
 
@@ -695,13 +694,10 @@ export function buildTools(): Tool[] {
             .logToolCall("show_product_image", args, "non trovato");
           return err(`Prodotto "${a.product_id}" non trovato.`);
         }
-        // Tutti i prodotti hanno .webp nel repo asset; cappuccino è anche
-        // disponibile come .jpeg per eventuale comparazione mimeType.
-        const ext = "webp";
-        const uri = `${IMAGE_BASE_URL}/${p.id}.${ext}`;
+        const uri = `${IMAGE_BASE_URL}/${p.id}.webp`;
         useCartStore
           .getState()
-          .logToolCall("show_product_image", args, `${p.id}.${ext}`);
+          .logToolCall("show_product_image", args, `${p.id}.webp`);
         return {
           content: [
             { type: "text", text: `Immagine del prodotto ${p.name} (${p.id}).` },
@@ -710,7 +706,7 @@ export function buildTools(): Tool[] {
               uri,
               name: `${p.name} — immagine editoriale`,
               description: `Foto editoriale di ${p.name}`,
-              mimeType: `image/${ext}`,
+              mimeType: "image/webp",
             },
           ],
         };
