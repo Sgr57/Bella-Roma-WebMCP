@@ -1,6 +1,7 @@
 # POC: foto prodotto inline nella chat — finding
 
-> **Branch**: `worktree-poc-product-image` · **Stato**: chiuso a maggio 2026 senza merge.
+> **Branch**: `poc-product-image` · **Stato**: chiuso a maggio 2026 senza merge.
+> **Preview live del POC**: <https://bella-roma-web-88ewnqgct-sgra57-8128s-projects.vercel.app/> (deploy Vercel sul commit HEAD del branch).
 > **Domanda di partenza**: si possono mostrare foto dei prodotti direttamente in chat (Claude Desktop / claude.ai / altri client) quando l'agente chiama un tool WebMCP come `get_product`?
 > **Risposta sintetica**: oggi, con il bridge `@mcp-b/webmcp-local-relay` v2.3.2 (lo stesso che la live demo monta in Claude Desktop), **no, non inline**. Si arriva al massimo a un widget *click-to-view* "Show Image". Il path per l'inline vero esiste (MCP Apps, spec del 26 gennaio 2026) ma richiede patch upstream del relay.
 
@@ -51,9 +52,17 @@ In ordine di scopo crescente:
 
 In alternativa, **aspettare** che `@mcp-b` rilasci il supporto resources (issue o PR ufficiale assente al 2026-05-22) oppure che Claude Desktop / claude.ai rendano inline anche i `<img>` da markdown del modello (cambio di policy lato Anthropic).
 
-## Stato del branch
+## Modifiche collaterali nel branch
 
-I 3 canali coesistono nel codice — è il setup che servirebbe in caso si volesse riprendere il POC dopo un fix upstream. Per buttare via il POC e tornare a `main`: `git checkout main && git branch -D worktree-poc-product-image`. Per ripartire dal punto in cui ci siamo fermati: si parte da questo branch e si lavora sul relay (vedi [Cosa servirebbe per chiudere](#cosa-servirebbe-per-chiudere)).
+Oltre all'estensione di `get_product`, il branch contiene una piccola modifica non strettamente legata al POC sull'immagine ma utile alla demo end-to-end:
+
+- **Relay default-on** ([commit `f77be95`](https://github.com/Sgr57/Bella-Roma-WebMCP/commit/f77be95)): in `src/lib/relay.ts` il flag `?relay=...` ha semantica invertita — il relay è attivo di default, e si disabilita con `?relay=false` (prima era l'opposto). Il toggle in header continua a funzionare allo stesso modo. Razionale: il caso d'uso primario della demo è "bridge a Claude Desktop attivo", quindi conviene non costringere a un click manuale.
+
+## Note operative per chi riprende il lavoro
+
+- **Vercel Deployment Protection è stata disattivata** sul progetto `bella-roma-web-mcp` durante il POC (per consentire al fetcher di Claude Desktop di scaricare gli asset preview senza autenticazione). Se viene riattivata, i preview restituiscono `401` e qualunque approccio basato su URL pubblica (canale 2 di sopra) smette di funzionare. La prod resta sempre pubblica.
+- **Tunnel locali tipo `cloudflared`** non funzionano su alcune reti corporate (UDP/TCP 7844 bloccati in egress). Su quella rete il path consigliato è il preview Vercel del branch — l'asset URL pattern è `https://bella-roma-web-mcp-git-<branch-slug-truncato>-<hash>-sgra57-8128s-projects.vercel.app/`. Per trovare l'URL di un commit specifico: `gh api repos/Sgr57/Bella-Roma-WebMCP/deployments?sha=<sha>` poi `gh api .../deployments/<id>/statuses` e leggere `environment_url`.
+- **Per buttare via il POC** e tornare a `main`: `git checkout main && git push origin :poc-product-image && git branch -D poc-product-image` (la branch sopravvive solo localmente fino al pull; se è già stata tirata su un'altra macchina sostituire i comandi locali con `git branch -D` post-checkout). Per ripartire dal punto in cui ci siamo fermati: si parte da questo branch e si lavora sul relay (vedi [Cosa servirebbe per chiudere](#cosa-servirebbe-per-chiudere)).
 
 ## Riferimenti
 
