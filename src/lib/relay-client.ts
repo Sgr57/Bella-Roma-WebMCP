@@ -32,11 +32,21 @@ type FakeClient = {
 };
 
 function serializeTool(t: Tool) {
-  return {
+  const out: {
+    name: string;
+    description: string;
+    inputSchema: Record<string, unknown>;
+    _meta?: Record<string, unknown>;
+  } = {
     name: t.name,
     description: t.description,
     inputSchema: t.inputSchema,
   };
+  // Forward MCP Apps `_meta` (e.g. `ui.resourceUri`) on the native-WS path
+  // so hosts can mount the matching widget. This mirrors the polyfill-embed
+  // path's `_meta` preservation through `getToolInfos`.
+  if (t._meta) out._meta = t._meta;
+  return out;
 }
 
 async function dispatch(

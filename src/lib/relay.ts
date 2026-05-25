@@ -1,8 +1,14 @@
 import { buildTools } from "./webmcp";
 import type { WebMCPMode } from "./polyfill";
 
-const EMBED_SRC =
-  "https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js";
+// Self-hosted MCP Apps-patched embed (Phase 3). The npm/jsdelivr version of
+// @mcp-b/webmcp-local-relay/dist/browser/embed.js does not yet forward
+// resources/* between the browser polyfill and the relay; we vendor the
+// patched build from Sgr57/webmcp-fork:feature/resources-forwarding into
+// public/webmcp/embed.js. Source: packages/webmcp-local-relay/dist/browser/
+// embed.js in the fork. Re-sync by running:
+//   cp ~/Projects/webmcp-fork/packages/webmcp-local-relay/dist/browser/embed.js public/webmcp/embed.js
+const EMBED_SRC = "/webmcp/embed.js";
 
 export type RelayVariant = "native-ws" | "polyfill-embed" | "off";
 

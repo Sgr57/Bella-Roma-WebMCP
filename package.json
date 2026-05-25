@@ -22,11 +22,19 @@
     "imagegen:favicon": "tsx scripts/gen-favicon.ts"
   },
   "dependencies": {
-    "@mcp-b/global": "^2.3.2",
+    "@mcp-b/global": "file:./vendor/webmcp/mcp-b-global-2.3.1.tgz",
     "framer-motion": "^12.38.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^5.0.13"
+  },
+  "overrides": {
+    "@mcp-b/global": "file:./vendor/webmcp/mcp-b-global-2.3.1.tgz",
+    "@mcp-b/webmcp-polyfill": "file:./vendor/webmcp/mcp-b-webmcp-polyfill-2.3.1.tgz",
+    "@mcp-b/webmcp-local-relay": "file:./vendor/webmcp/mcp-b-webmcp-local-relay-2.3.1.tgz",
+    "@mcp-b/webmcp-types": "file:./vendor/webmcp/mcp-b-webmcp-types-2.3.1.tgz",
+    "@mcp-b/webmcp-ts-sdk": "file:./vendor/webmcp/mcp-b-webmcp-ts-sdk-2.3.1.tgz",
+    "@mcp-b/transports": "file:./vendor/webmcp/mcp-b-transports-2.3.1.tgz"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

@@ -6,6 +6,17 @@ import {
   type SweetnessOption,
 } from "./products";
 import { defaultOptionsFor, useCartStore } from "../store/cart";
+import {
+  buildCartPanelHtml,
+  buildProductCardHtml,
+  buildProductGridHtml,
+  cartPanelUri,
+  productCardUri,
+  productGridUri,
+  WIDGET_MIME_TYPE,
+  WIDGET_RESOURCE_DOMAINS,
+  type CartSnapshot,
+} from "./widgets";
 
 const MAX_LINE_QUANTITY = 10;
 
@@ -71,6 +82,20 @@ export type Tool = {
   description: string;
   inputSchema: Record<string, unknown>;
   execute: (args: Record<string, unknown>, agent?: Agent) => Promise<ToolResult>;
+  /**
+   * MCP Apps `_meta` (spec 2026-01-26). When `_meta.ui.resourceUri` is set,
+   * hosts that support MCP Apps mount the named `ui://` resource as an
+   * inline widget alongside the tool result. Clients without MCP Apps
+   * support ignore `_meta` and render only `content`.
+   */
+  _meta?: {
+    ui?: {
+      resourceUri?: string;
+      // Other MCP Apps tool-level hints (visibility, etc.) live here when
+      // we adopt them — out of scope for v1.
+    };
+    [k: string]: unknown;
+  };
 };
 
 function ok(text: string): ToolResult {
@@ -78,6 +103,67 @@ function ok(text: string): ToolResult {
 }
 function err(text: string): ToolResult {
   return { content: [{ type: "text", text }], isError: true };
+}
+
+// ---- MCP Apps widget state (Phase 3) --------------------------------------
+//
+// Three widgets need data that is computed by the tool call that triggered
+// them. We capture the last invocation's data so the `ui://` resource
+// provider — invoked LATER by the host via `resources/read` — can render
+// the right product set / product card / cart snapshot.
+//
+// This mirrors how reference MCP Apps servers work (e.g. the cohort-heatmap
+// example caches the last `query_cohorts` result keyed by a session id).
+// Because BellaRoma's host today only mounts one widget at a time, a
+// single mutable slot per widget is sufficient.
+
+type LastSearchResults = {
+  queryLabel: string;
+  products: ReturnType<typeof PRODUCTS.filter>;
+};
+
+const widgetState = {
+  lastSearch: null as LastSearchResults | null,
+  lastProductId: null as string | null,
+};
+
+function describeSearchQuery(args: Record<string, unknown>): string {
+  const bits: string[] = [];
+  const a = args as Record<string, unknown>;
+  if (typeof a.query === "string" && a.query.length > 0) bits.push(`"${a.query}"`);
+  if (typeof a.category === "string") bits.push(a.category);
+  if (typeof a.type === "string") bits.push(a.type);
+  if (typeof a.origin === "string") bits.push(a.origin);
+  if (Array.isArray(a.tags) && a.tags.length > 0)
+    bits.push(`tag: ${(a.tags as string[]).join("+")}`);
+  if (Array.isArray(a.dietary) && a.dietary.length > 0)
+    bits.push((a.dietary as string[]).join("+"));
+  if (Array.isArray(a.flavor_notes) && a.flavor_notes.length > 0)
+    bits.push((a.flavor_notes as string[]).join("+"));
+  if (typeof a.max_price === "number") bits.push(`< €${a.max_price}`);
+  return bits.length > 0 ? bits.join(" · ") : "Tutti i prodotti";
+}
+
+function snapshotCart(): CartSnapshot {
+  const s = useCartStore.getState();
+  return {
+    items: s.items.map((it) => ({
+      productId: it.productId,
+      quantity: it.quantity,
+      ...(it.options ? { options: { ...it.options } } : {}),
+    })),
+    coupon: s.coupon,
+    subtotal: s.subtotal(),
+    discount: s.discount(),
+    total: s.total(),
+  };
+}
+
+// Reset helper used by tests so a previous test's invocation cannot leak
+// into the next one's widget state.
+export function __resetWidgetStateForTests(): void {
+  widgetState.lastSearch = null;
+  widgetState.lastProductId = null;
 }
 
 function formatAlternatives(ids?: string[]): string {
@@ -134,6 +220,7 @@ export function buildTools(): Tool[] {
       name: "search_products",
       description:
         "Cerca prodotti nel catalogo (drink, food, beans, capsule). I prodotti di tipo milk_option sono esclusi di default — passa type:'milk_option' per includerli. Tutti i filtri sono in AND; tags/dietary/flavor_notes sono AND interno (il prodotto deve avere tutti i valori richiesti).",
+      _meta: { ui: { resourceUri: productGridUri() } },
       inputSchema: {
         type: "object",
         properties: {
@@ -276,6 +363,13 @@ export function buildTools(): Tool[] {
               })
               .join("\n")
           : "Nessun prodotto trovato.";
+        // Capture the result set so the product-grid widget provider
+        // (registered via navigator.modelContext.resources) can render the
+        // same list when the host later issues `resources/read`.
+        widgetState.lastSearch = {
+          queryLabel: describeSearchQuery(args),
+          products: results,
+        };
         useCartStore
           .getState()
           .logToolCall("search_products", args, `${results.length} risultati`);
@@ -284,6 +378,7 @@ export function buildTools(): Tool[] {
     },
     {
       name: "get_product",
+      _meta: { ui: { resourceUri: productCardUri() } },
       description:
         "Restituisce la scheda completa di un prodotto: attributi (intensità, origine, note aromatiche, dietary, tag, time_of_day), disponibilità, alternative se esaurito, pairing consigliati, prodotti correlati (es. chicchi da asporto della stessa bevanda) e opzioni di personalizzazione (size, milk, sweetness). Usalo per ragionare su un singolo prodotto in dettaglio.",
       inputSchema: {
@@ -382,6 +477,9 @@ export function buildTools(): Tool[] {
           }
         }
         const text = lines.join("\n");
+        // Remember which product this was so the product-card widget
+        // provider can render it on the next `resources/read` request.
+        widgetState.lastProductId = p.id;
         useCartStore
           .getState()
           .logToolCall("get_product", args, `${p.id} (${p.type})`);
@@ -646,6 +744,7 @@ export function buildTools(): Tool[] {
     {
       name: "get_cart",
       description: "Ritorna il contenuto corrente del carrello con totali.",
+      _meta: { ui: { resourceUri: cartPanelUri() } },
       inputSchema: { type: "object", properties: {} },
       async execute() {
         const s = useCartStore.getState();
@@ -671,7 +770,7 @@ export function buildTools(): Tool[] {
     {
       name: "show_product_image",
       description:
-        "Restituisce l'immagine editoriale del prodotto come MCP resource_link (URI pubblico HTTPS, WebP). Da usare quando l'utente chiede di 'vedere', 'mostrare', 'fammi vedere' un prodotto. Il client decide come renderizzare il link (inline preview vs widget). Non modifica lo stato.",
+        "DEPRECATO — preferire `get_product` (mostra una scheda widget interattiva sui client MCP Apps). Restituisce l'immagine editoriale del prodotto come MCP resource_link. Mantenuto per i client privi di MCP Apps (Gemini, ecc.) che renderizzano solo i resource_link.",
       inputSchema: {
         type: "object",
         properties: {
@@ -746,6 +845,15 @@ export function buildTools(): Tool[] {
 
 let registered = false;
 
+/**
+ * Test-only helper. Resets the `registered` guard so `registerTools()` can
+ * be re-invoked against a fresh `navigator.modelContext` stub.
+ */
+export function __resetForTests(): void {
+  registered = false;
+  __resetWidgetStateForTests();
+}
+
 async function listExistingToolNames(getTools?: () => unknown): Promise<Set<string>> {
   if (!getTools) return new Set();
   try {
@@ -755,6 +863,146 @@ async function listExistingToolNames(getTools?: () => unknown): Promise<Set<stri
   } catch {
     return new Set();
   }
+}
+
+// ---- MCP Apps widget providers --------------------------------------------
+//
+// Three widget resources registered via the polyfill's `resources` namespace
+// (Phase 2 of the resources-forwarding fork). Each provider returns a
+// `text/html;profile=mcp-app` payload and CSP `_meta` declaring jsdelivr
+// for product images.
+//
+// Providers are CALLED LAZILY by the polyfill when the host issues
+// `resources/read` — not at registration time. They read `widgetState`
+// (set by the last `search_products` / `get_product` / `get_cart` call)
+// to know what to render. If the state slot is empty (no preceding call)
+// the provider returns a sensible default snapshot.
+
+interface ResourceProviderResult {
+  text?: string;
+  blob?: string;
+  mimeType: string;
+  meta?: Record<string, unknown>;
+}
+
+type ResourcesNamespace = {
+  register: (
+    uri: string,
+    provider: () => Promise<ResourceProviderResult> | ResourceProviderResult,
+    options?: {
+      name?: string;
+      title?: string;
+      description?: string;
+      mimeType?: string;
+      _meta?: Record<string, unknown>;
+    },
+  ) => void;
+  unregister: (uri: string) => void;
+};
+
+function getResourcesNamespace(
+  mc: object,
+): ResourcesNamespace | null {
+  const candidate = (mc as { resources?: unknown }).resources;
+  if (!candidate || typeof candidate !== "object") return null;
+  const c = candidate as Record<string, unknown>;
+  if (typeof c.register !== "function" || typeof c.unregister !== "function") {
+    return null;
+  }
+  return c as unknown as ResourcesNamespace;
+}
+
+// Shared CSP `_meta` for every widget. `resourceDomains` is for img/script
+// hosts; `connectDomains` lists callback endpoints (relay-bound websocket
+// origins). The relay uses 127.0.0.1:9333; we whitelist both ws and http
+// hosts for it. Hosts treat absent connect domains as deny-list anyway.
+const WIDGET_CSP_META = {
+  ui: {
+    csp: {
+      resourceDomains: WIDGET_RESOURCE_DOMAINS,
+      connectDomains: ["http://127.0.0.1:9333", "ws://127.0.0.1:9333"],
+    },
+  },
+} as const;
+
+async function provideProductGrid(): Promise<ResourceProviderResult> {
+  const snap = widgetState.lastSearch;
+  const products = snap?.products ?? PRODUCTS.filter((p) => p.type !== "milk_option");
+  const queryLabel = snap?.queryLabel ?? "Tutti i prodotti";
+  return {
+    text: buildProductGridHtml(products, queryLabel),
+    mimeType: WIDGET_MIME_TYPE,
+    meta: WIDGET_CSP_META,
+  };
+}
+
+async function provideProductCard(): Promise<ResourceProviderResult> {
+  const id = widgetState.lastProductId;
+  const product = id ? getProductById(id) : undefined;
+  if (!product) {
+    // Default to the first available drink so the widget is never blank.
+    const fallback = PRODUCTS.find((p) => p.type === "drink" && p.available);
+    if (!fallback) {
+      throw new Error("Nessun prodotto disponibile");
+    }
+    return {
+      text: buildProductCardHtml(fallback),
+      mimeType: WIDGET_MIME_TYPE,
+      meta: WIDGET_CSP_META,
+    };
+  }
+  return {
+    text: buildProductCardHtml(product),
+    mimeType: WIDGET_MIME_TYPE,
+    meta: WIDGET_CSP_META,
+  };
+}
+
+async function provideCartPanel(): Promise<ResourceProviderResult> {
+  return {
+    text: buildCartPanelHtml(snapshotCart()),
+    mimeType: WIDGET_MIME_TYPE,
+    meta: WIDGET_CSP_META,
+  };
+}
+
+function registerWidgets(resources: ResourcesNamespace): number {
+  let count = 0;
+  try {
+    resources.register(productGridUri(), provideProductGrid, {
+      name: "bellaroma-product-grid",
+      title: "Catalogo Bella Roma",
+      description: "Griglia prodotti interattiva per i risultati di search_products.",
+      mimeType: WIDGET_MIME_TYPE,
+    });
+    count++;
+  } catch (err) {
+    console.warn("[webmcp] failed to register product-grid widget:", err);
+  }
+  try {
+    resources.register(productCardUri(), provideProductCard, {
+      name: "bellaroma-product-card",
+      title: "Scheda prodotto Bella Roma",
+      description:
+        "Scheda dettaglio con configuratore size/milk/sweetness e prezzo dinamico.",
+      mimeType: WIDGET_MIME_TYPE,
+    });
+    count++;
+  } catch (err) {
+    console.warn("[webmcp] failed to register product-card widget:", err);
+  }
+  try {
+    resources.register(cartPanelUri(), provideCartPanel, {
+      name: "bellaroma-cart-panel",
+      title: "Carrello Bella Roma",
+      description: "Carrello live con stepper, coupon e checkout.",
+      mimeType: WIDGET_MIME_TYPE,
+    });
+    count++;
+  } catch (err) {
+    console.warn("[webmcp] failed to register cart-panel widget:", err);
+  }
+  return count;
 }
 
 export async function registerTools(): Promise<void> {
@@ -789,13 +1037,27 @@ export async function registerTools(): Promise<void> {
     }
     registered = true;
     console.info(`[webmcp] registered ${count}/${tools.length} tools via native registerTool`);
-    return;
-  }
-  if (typeof mc.provideContext === "function") {
+  } else if (typeof mc.provideContext === "function") {
     mc.provideContext({ tools });
     registered = true;
     console.info(`[webmcp] registered ${tools.length} tools via provideContext`);
+  } else {
+    console.warn("[webmcp] modelContext present but no known registration API");
     return;
   }
-  console.warn("[webmcp] modelContext present but no known registration API");
+
+  // MCP Apps Phase 3: register the 3 widget resources alongside the tools.
+  // Gracefully no-op when the polyfill doesn't expose `resources` (e.g.
+  // unpatched polyfill or future Chrome native that hasn't implemented it).
+  const resources = getResourcesNamespace(mc);
+  if (!resources) {
+    console.info(
+      "[webmcp] navigator.modelContext.resources unavailable — MCP Apps widgets disabled (text/resource_link fallback active)",
+    );
+    return;
+  }
+  const widgetCount = registerWidgets(resources);
+  console.info(
+    `[webmcp] registered ${widgetCount}/3 MCP Apps widget resources via navigator.modelContext.resources`,
+  );
 }
