@@ -63,6 +63,29 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/**
+ * Safely embed a JS value inside a `<script>` block.
+ *
+ * `JSON.stringify` alone does NOT escape `</script>` or `<!--`. A future
+ * contributor adding user-supplied state to a serialized payload (search
+ * query, custom note, etc.) could create an XSS sink where the inlined JSON
+ * closes the host `<script>` tag prematurely. We:
+ *
+ * 1. `JSON.stringify` the value twice (the outer pass turns the result into
+ *    a JS string literal we can write inline as the argument to JSON.parse).
+ * 2. Replace the `</` substring in that string literal with `<\/` — JSON
+ *    treats `\/` as equivalent to `/`, but the HTML parser no longer sees
+ *    a closing tag. This is the standard "JSON-in-script" mitigation
+ *    (see e.g. React's `serialize-javascript`).
+ *
+ * Round-trip semantics are identical to `JSON.stringify`. Use this everywhere
+ * we inline structured state into widget HTML.
+ */
+export function embedAsJson(value: unknown): string {
+  const inner = JSON.stringify(JSON.stringify(value)).replace(/<\//g, "<\\/");
+  return `JSON.parse(${inner})`;
+}
+
 function imageUrl(productId: string): string {
   return `${IMAGE_BASE_URL}/${productId}.webp`;
 }
@@ -214,26 +237,28 @@ const BRIDGE_JS = `
     };
     __post(request);
     return new Promise(function (resolve) {
-      __pendingCalls.set(id, resolve);
-      setTimeout(function () {
+      const timer = setTimeout(function () {
         if (__pendingCalls.has(id)) {
           __pendingCalls.delete(id);
           resolve({ ok: false, error: "timeout" });
         }
       }, 15000);
+      __pendingCalls.set(id, { resolve: resolve, timer: timer });
     });
   }
   window.addEventListener("message", function (ev) {
     const data = ev.data;
     if (!data || typeof data !== "object") return;
     // JSON-RPC reply path (host returns id matching our request).
-    if (data.id && __pendingCalls.has(data.id)) {
-      const resolver = __pendingCalls.get(data.id);
+    // Note: id != null so we do not accidentally skip id === 0.
+    if (data.id != null && __pendingCalls.has(data.id)) {
+      const entry = __pendingCalls.get(data.id);
       __pendingCalls.delete(data.id);
+      clearTimeout(entry.timer);
       if (data.error) {
-        resolver({ ok: false, error: data.error.message || String(data.error) });
+        entry.resolve({ ok: false, error: data.error.message || String(data.error) });
       } else {
-        resolver({ ok: true, result: data.result });
+        entry.resolve({ ok: true, result: data.result });
       }
     }
     // ui/notifications/tool-result path — host may not echo our id.
@@ -646,9 +671,11 @@ export function buildProductCardHtml(p: Product): string {
 </style>`;
 
   // Encode the configurator state as a JSON string we parse inside the
-  // widget. Avoids HTML-escape ambiguity inside a <script> block.
+  // widget. See `embedAsJson` for the rationale behind double-encoding —
+  // it prevents `</script>` and similar substrings in serialized state from
+  // closing the host `<script>` tag.
   const js = `
-  const _state = JSON.parse(${JSON.stringify(JSON.stringify(initialState))});
+  const _state = ${embedAsJson(initialState)};
   function totalPrice() {
     let p = _state.basePrice;
     if (_state.size && _state.sizeMods && typeof _state.sizeMods[_state.size] === "number") {
@@ -977,7 +1004,7 @@ export function buildCartPanelHtml(snapshot: CartSnapshot): string {
   }));
 
   const js = `
-  const __rows = ${JSON.stringify(rowsMeta)};
+  const __rows = ${embedAsJson(rowsMeta)};
   function findRowMeta(key) {
     return __rows.find(function (r) { return rowKey(r) === key; });
   }
@@ -998,10 +1025,31 @@ export function buildCartPanelHtml(snapshot: CartSnapshot): string {
         const res = await callTool("add_to_cart", args);
         __toast(res.ok ? (extractText(res.result) || "+1") : ("Errore: " + res.error), !res.ok || (res.result && res.result.isError));
       } else if (action === "dec") {
+        // Cart store's remove_from_cart deletes the WHOLE row, so we
+        // emulate "decrement by 1" as remove + re-add(quantity-1). When
+        // quantity is already 1, removing the row IS the correct
+        // decrement. The host (re-)renders the snapshot after either
+        // call, so the user sees a single coherent state.
         const args = { product_id: meta.productId };
         if (meta.options) args.options = meta.options;
-        const res = await callTool("remove_from_cart", args);
-        __toast(res.ok ? (extractText(res.result) || "−1") : ("Errore: " + res.error), !res.ok || (res.result && res.result.isError));
+        if (meta.quantity > 1) {
+          const removeRes = await callTool("remove_from_cart", args);
+          if (!removeRes.ok) {
+            __toast("Errore: " + removeRes.error, true);
+            return;
+          }
+          if (removeRes.result && removeRes.result.isError) {
+            __toast(extractText(removeRes.result) || "Errore", true);
+            return;
+          }
+          const addArgs = { product_id: meta.productId, quantity: meta.quantity - 1 };
+          if (meta.options) addArgs.options = meta.options;
+          const addRes = await callTool("add_to_cart", addArgs);
+          __toast(addRes.ok ? "−1" : ("Errore: " + addRes.error), !addRes.ok || (addRes.result && addRes.result.isError));
+        } else {
+          const res = await callTool("remove_from_cart", args);
+          __toast(res.ok ? (extractText(res.result) || "Rimosso") : ("Errore: " + res.error), !res.ok || (res.result && res.result.isError));
+        }
       }
     });
   });

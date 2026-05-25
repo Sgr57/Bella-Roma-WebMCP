@@ -1,8 +1,9 @@
 import type { Tool, ToolResult } from "./webmcp";
+import { RELAY_WS_URL } from "./relay-config";
 
 export type RelayState = "idle" | "connecting" | "open" | "closed" | "error";
 
-const RELAY_URL = "ws://127.0.0.1:9333";
+const RELAY_URL = RELAY_WS_URL;
 const INITIAL_RECONNECT_MS = 2000;
 const MAX_RECONNECT_MS = 30000;
 

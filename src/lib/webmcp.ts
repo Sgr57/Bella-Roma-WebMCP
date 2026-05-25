@@ -17,6 +17,7 @@ import {
   WIDGET_RESOURCE_DOMAINS,
   type CartSnapshot,
 } from "./widgets";
+import { RELAY_HTTP_URL, RELAY_WS_URL } from "./relay-config";
 
 const MAX_LINE_QUANTITY = 10;
 
@@ -914,13 +915,14 @@ function getResourcesNamespace(
 
 // Shared CSP `_meta` for every widget. `resourceDomains` is for img/script
 // hosts; `connectDomains` lists callback endpoints (relay-bound websocket
-// origins). The relay uses 127.0.0.1:9333; we whitelist both ws and http
-// hosts for it. Hosts treat absent connect domains as deny-list anyway.
+// origins). Endpoint values come from `relay-config.ts` so the relay client
+// and the CSP allow-list never drift apart. Hosts treat absent connect
+// domains as deny-list anyway.
 const WIDGET_CSP_META = {
   ui: {
     csp: {
       resourceDomains: WIDGET_RESOURCE_DOMAINS,
-      connectDomains: ["http://127.0.0.1:9333", "ws://127.0.0.1:9333"],
+      connectDomains: [RELAY_HTTP_URL, RELAY_WS_URL],
     },
   },
 } as const;
