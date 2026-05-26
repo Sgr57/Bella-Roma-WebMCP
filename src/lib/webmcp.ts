@@ -536,15 +536,20 @@ export function buildTools(): Tool[] {
     {
       name: "remove_from_cart",
       description:
-        "Rimuove una riga dal carrello. Passa anche 'options' (size/milk/sweetness) se il carrello contiene più righe dello stesso prodotto con opzioni diverse, altrimenti viene rimossa la prima riga che combacia con il product_id.",
+        "Rimuove una riga dal carrello.\n" +
+        "Usalo quando l'utente dice \"togli\", \"rimuovi\", \"non lo voglio più\".\n" +
+        "Passa anche 'options' se ci sono più righe dello stesso prodotto con opzioni\n" +
+        "diverse, altrimenti viene rimossa la prima che combacia con product_id.\n" +
+        "Output: structuredContent.kind=\"mutation_result\" con ok, message, cart.\n" +
+        "Renderizza il message + la card carrello aggiornata.\n" +
+        "Dopo: se il carrello è ora vuoto invita a esplorare con search_products.",
       inputSchema: {
         type: "object",
         properties: {
           product_id: { type: "string" },
           options: {
             type: "object",
-            description:
-              "Opzioni per disambiguare quale riga rimuovere (size/milk/sweetness).",
+            description: "Opzioni per disambiguare quale riga rimuovere (size/milk/sweetness).",
             properties: {
               size: { type: "string", enum: ["S", "M", "L"] },
               milk: { type: "string" },
@@ -554,34 +559,28 @@ export function buildTools(): Tool[] {
         },
         required: ["product_id"],
       },
+      outputSchema: MUTATION_RESULT_SCHEMA,
       async execute(args) {
         const a = args as {
           product_id?: unknown;
           options?: { size?: SizeOption; milk?: string; sweetness?: SweetnessOption };
         };
         if (typeof a.product_id !== "string" || a.product_id.length === 0) {
-          useCartStore
-            .getState()
-            .logToolCall("remove_from_cart", args, "errore: product_id mancante");
-          return err("Parametro 'product_id' obbligatorio (stringa non vuota).");
+          useCartStore.getState().logToolCall("remove_from_cart", args, "errore: product_id mancante");
+          return mutErr("remove_from_cart", "product_not_found", "Parametro 'product_id' obbligatorio.");
         }
-        const product_id = a.product_id;
-        const product = findProductCaseInsensitive(product_id);
-        const canonicalId = product?.id ?? product_id;
-        const removed = useCartStore
-          .getState()
-          .removeItem(canonicalId, a.options);
+        const product = findProductCaseInsensitive(a.product_id);
+        const canonicalId = product?.id ?? a.product_id;
+        const removed = useCartStore.getState().removeItem(canonicalId, a.options);
         if (!removed) {
-          useCartStore
-            .getState()
-            .logToolCall("remove_from_cart", args, "non era nel carrello");
-          return err(`"${product_id}" non era nel carrello.`);
+          useCartStore.getState().logToolCall("remove_from_cart", args, "non era nel carrello");
+          return mutErr("remove_from_cart", "not_in_cart", `"${a.product_id}" non era nel carrello.`);
         }
         const remaining = useCartStore.getState().quantityFor(canonicalId);
         const tail = remaining > 0 ? ` Restano ${remaining} unità con opzioni diverse.` : "";
         const msg = `Rimosso "${canonicalId}" dal carrello.${tail}`;
         useCartStore.getState().logToolCall("remove_from_cart", args, msg);
-        return ok(msg);
+        return mutOk("remove_from_cart", msg);
       },
     },
     {

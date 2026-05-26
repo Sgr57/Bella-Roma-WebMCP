@@ -200,6 +200,25 @@ describe("WebMCP tools", () => {
     expect(useCartStore.getState().items).toEqual([]);
   });
 
+  it("remove_from_cart returns mutation_result ok=true with cart updated", async () => {
+    await findTool("add_to_cart").execute({ product_id: "espresso", quantity: 1 }, fakeAgent);
+    const res = await findTool("remove_from_cart").execute({ product_id: "espresso" }, fakeAgent);
+    expect(res.structuredContent).toMatchObject({
+      kind: "mutation_result",
+      ok: true,
+      tool: "remove_from_cart",
+      cart: expect.objectContaining({ empty: true }),
+    });
+  });
+
+  it("remove_from_cart returns error.code=not_in_cart when missing", async () => {
+    const res = await findTool("remove_from_cart").execute({ product_id: "espresso" }, fakeAgent);
+    expect(res.structuredContent).toMatchObject({
+      ok: false,
+      error: expect.objectContaining({ code: "not_in_cart" }),
+    });
+  });
+
   it("apply_coupon applies BENVENUTO", async () => {
     useCartStore.getState().addItem("espresso", 10);
     const res = await findTool("apply_coupon").execute(
