@@ -2,6 +2,15 @@
 // Una sola `kind` discriminator per ogni shape; Claude Desktop sceglie
 // lo stile di rendering markdown in base al kind.
 
+import {
+  getProductById,
+  COUPONS,
+  type Product,
+  type SizeOption,
+  type SweetnessOption,
+} from "./products";
+import { useCartStore, lineUnitPrice, type CartItemOptions } from "../store/cart";
+
 export type ErrorCode =
   | "product_not_found"
   | "out_of_stock"
@@ -335,3 +344,265 @@ export const MUTATION_RESULT_SCHEMA = {
   },
   required: ["kind", "ok", "tool", "cart"],
 } as const;
+
+const IMAGE_BASE_URL =
+  "https://cdn.jsdelivr.net/gh/Sgr57/Bella-Roma-WebMCP@main/public/products/editorial";
+
+function imageUrlFor(productId: string): string {
+  return `${IMAGE_BASE_URL}/${productId}.webp`;
+}
+
+function toMiniCards(ids: string[] | undefined, relation?: string): MiniProductCard[] {
+  if (!ids) return [];
+  const out: MiniProductCard[] = [];
+  for (const id of ids) {
+    const p = getProductById(id);
+    if (!p) continue;
+    const mini: MiniProductCard = {
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      image_url: imageUrlFor(p.id),
+    };
+    if (relation) mini.relation = relation;
+    out.push(mini);
+  }
+  return out;
+}
+
+const SIZE_LABELS: Record<SizeOption, string> = { S: "Small", M: "Medium", L: "Large" };
+
+const MILK_LABEL_OVERRIDES: Record<string, string> = {
+  "milk-whole": "Intero",
+  "milk-oat": "Avena",
+  "milk-soy": "Soia",
+  "milk-almond": "Mandorla",
+  "milk-lactose-free": "Senza lattosio",
+};
+
+const SWEETNESS_LABELS: Record<SweetnessOption, string> = {
+  none: "Senza",
+  low: "Poco",
+  normal: "Normale",
+};
+
+function defaultActionsFor(product: Product): NextAction[] {
+  if (product.type === "milk_option") return [];
+  if (!product.available) return [];
+  const args: Record<string, unknown> = { product_id: product.id, quantity: 1 };
+  if (product.options) {
+    const options: Record<string, unknown> = {};
+    if (product.options.size) options.size = product.options.size.default;
+    if (product.options.milk) options.milk = product.options.milk.default;
+    if (product.options.sweetness) options.sweetness = product.options.sweetness.default;
+    if (Object.keys(options).length > 0) args.options = options;
+  }
+  return [
+    {
+      tool: "add_to_cart",
+      intent: "aggiungi questo prodotto con le opzioni scelte",
+      args_template: args,
+    },
+  ];
+}
+
+function buildCustomization(product: Product): Record<string, CustomizationGroup> | undefined {
+  if (!product.options) return undefined;
+  const out: Record<string, CustomizationGroup> = {};
+  if (product.options.size) {
+    const sz = product.options.size;
+    out.size = {
+      label: "Size",
+      default: sz.default,
+      options: sz.values.map((v) => ({
+        id: v,
+        label: SIZE_LABELS[v],
+        price_delta: sz.price_modifier[v] ?? 0,
+        available: true,
+      })),
+    };
+  }
+  if (product.options.milk) {
+    const m = product.options.milk;
+    out.milk = {
+      label: "Latte",
+      default: m.default,
+      options: m.values.map((id) => {
+        const milkProduct = getProductById(id);
+        const choice: OptionChoice = {
+          id,
+          label: MILK_LABEL_OVERRIDES[id] ?? milkProduct?.name ?? id,
+          price_delta: milkProduct?.price ?? 0,
+          available: milkProduct?.available ?? true,
+        };
+        if (milkProduct && !milkProduct.available && milkProduct.alternatives?.length) {
+          choice.alternatives = milkProduct.alternatives;
+        }
+        return choice;
+      }),
+    };
+  }
+  if (product.options.sweetness) {
+    const s = product.options.sweetness;
+    out.sweetness = {
+      label: "Zucchero",
+      default: s.default,
+      options: s.values.map((v) => ({ id: v, label: SWEETNESS_LABELS[v] })),
+    };
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+export function buildProductCard(product: Product): ProductCard {
+  const customization = buildCustomization(product);
+  const card: ProductCardPayload = {
+    id: product.id,
+    name: product.name,
+    price: product.price,
+    currency: "EUR",
+    image_url: imageUrlFor(product.id),
+    description: product.description,
+    category: product.category,
+    type: product.type,
+    available: product.available,
+    tags: product.tags ?? [],
+    attributes: {
+      ...(typeof product.intensity === "number"
+        ? { intensity: { value: product.intensity, scale: 10 } }
+        : {}),
+      ...(product.origin ? { origin: product.origin } : {}),
+      ...(product.flavor_notes ? { flavor_notes: product.flavor_notes } : {}),
+      ...(product.dietary ? { dietary: product.dietary } : {}),
+      ...(product.temperature ? { temperature: product.temperature } : {}),
+      ...(product.time_of_day ? { time_of_day: product.time_of_day } : {}),
+    },
+    pairings: toMiniCards(product.pairings),
+    related_products: toMiniCards(product.related_products, "take_home"),
+    alternatives: toMiniCards(product.alternatives),
+    next_actions: defaultActionsFor(product),
+  };
+  if (customization) card.customization = customization;
+  return { kind: "product_card", product: card };
+}
+
+function listItemActionsFor(product: Product): NextAction[] {
+  if (!product.available) return [];
+  const get: NextAction = {
+    tool: "get_product",
+    args_template: { product_id: product.id },
+  };
+  if (product.options) return [get];
+  return [
+    get,
+    {
+      tool: "add_to_cart",
+      args_template: { product_id: product.id, quantity: 1 },
+    },
+  ];
+}
+
+export function buildProductList(products: Product[], querySummary: string): ProductList {
+  return {
+    kind: "product_list",
+    query_summary: querySummary,
+    total: products.length,
+    items: products.map((p) => {
+      const item: ProductListItem = {
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        currency: "EUR",
+        image_url: imageUrlFor(p.id),
+        description: p.description,
+        available: p.available,
+        has_customization: Boolean(
+          p.options && (p.options.size || p.options.milk || p.options.sweetness),
+        ),
+        next_actions: listItemActionsFor(p),
+      };
+      if (typeof p.intensity === "number") item.intensity = p.intensity;
+      if (p.origin) item.origin = p.origin;
+      if (p.flavor_notes?.length) item.flavor_notes = p.flavor_notes;
+      if (p.dietary?.length) item.dietary = p.dietary;
+      if (p.tags?.length) item.tags = p.tags;
+      return item;
+    }),
+  };
+}
+
+function formatOptionsLabel(o: CartItemOptions | undefined): string {
+  if (!o) return "";
+  const bits: string[] = [];
+  if (o.size) bits.push(o.size);
+  if (o.milk) {
+    const m = getProductById(o.milk);
+    const label = m
+      ? `latte ${MILK_LABEL_OVERRIDES[o.milk]?.toLowerCase() ?? m.name.toLowerCase()}`
+      : `latte ${o.milk}`;
+    const delta = m && m.price > 0 ? ` (+€${m.price.toFixed(2)})` : "";
+    bits.push(`${label}${delta}`);
+  }
+  if (o.sweetness) bits.push(`zucchero ${SWEETNESS_LABELS[o.sweetness].toLowerCase()}`);
+  return bits.join(", ");
+}
+
+export function buildCart(): Cart {
+  const s = useCartStore.getState();
+  const lines: CartLine[] = s.items.map((it) => {
+    const p = getProductById(it.productId);
+    const unit = lineUnitPrice(it);
+    const line: CartLine = {
+      product_id: it.productId,
+      name: p?.name ?? it.productId,
+      image_url: imageUrlFor(it.productId),
+      quantity: it.quantity,
+      options_label: formatOptionsLabel(it.options),
+      unit_price: unit,
+      line_total: Math.round(unit * it.quantity * 100) / 100,
+    };
+    if (it.options) line.options = it.options;
+    return line;
+  });
+  const subtotal = Math.round(s.subtotal() * 100) / 100;
+  const discount = s.discount();
+  const total = Math.round(s.total() * 100) / 100;
+  const coupon: CouponSummary | null = s.coupon
+    ? {
+        code: s.coupon,
+        label: COUPONS[s.coupon]?.description ?? s.coupon,
+        discount: Math.round(discount * 100) / 100,
+      }
+    : null;
+  const empty = lines.length === 0;
+  const nextActions: NextAction[] = [];
+  if (!empty) nextActions.push({ tool: "checkout", intent: "completa l'ordine" });
+  if (!coupon) nextActions.push({ tool: "apply_coupon", intent: "applica un coupon" });
+  if (!empty) nextActions.push({ tool: "clear_cart", intent: "ricomincia da zero" });
+  return {
+    kind: "cart",
+    lines,
+    subtotal,
+    coupon,
+    total,
+    currency: "EUR",
+    empty,
+    next_actions: nextActions,
+  };
+}
+
+export function buildMutationResult(input: {
+  ok: boolean;
+  tool: string;
+  message?: string;
+  error?: MutationError;
+}): MutationResult {
+  const result: MutationResult = {
+    kind: "mutation_result",
+    ok: input.ok,
+    tool: input.tool,
+    cart: buildCart(),
+  };
+  if (input.message !== undefined) result.message = input.message;
+  if (input.error !== undefined) result.error = input.error;
+  return result;
+}
