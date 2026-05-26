@@ -220,7 +220,7 @@ export function buildTools(): Tool[] {
     {
       name: "search_products",
       description:
-        "Cerca prodotti nel catalogo (drink, food, beans, capsule). I prodotti di tipo milk_option sono esclusi di default — passa type:'milk_option' per includerli. Tutti i filtri sono in AND; tags/dietary/flavor_notes sono AND interno (il prodotto deve avere tutti i valori richiesti).",
+        "Cerca prodotti nel catalogo (drink, food, beans, capsule). Quando l'utente nomina un prodotto specifico (es. 'voglio un cappuccino', 'mostrami l'espresso') preferisci `get_product` per la scheda dettagliata; usa `search_products` per query di browse/filtro (es. 'cosa avete di filtro', 'prodotti senza lattosio'). I prodotti di tipo milk_option sono esclusi di default — passa type:'milk_option' per includerli. Tutti i filtri sono in AND; tags/dietary/flavor_notes sono AND interno (il prodotto deve avere tutti i valori richiesti).",
       _meta: { ui: { resourceUri: productGridUri() } },
       inputSchema: {
         type: "object",
@@ -381,7 +381,7 @@ export function buildTools(): Tool[] {
       name: "get_product",
       _meta: { ui: { resourceUri: productCardUri() } },
       description:
-        "Restituisce la scheda completa di un prodotto: attributi (intensità, origine, note aromatiche, dietary, tag, time_of_day), disponibilità, alternative se esaurito, pairing consigliati, prodotti correlati (es. chicchi da asporto della stessa bevanda) e opzioni di personalizzazione (size, milk, sweetness). Usalo per ragionare su un singolo prodotto in dettaglio.",
+        "USA QUESTO TOOL quando l'utente esprime interesse in un prodotto specifico (es. 'voglio un cappuccino', 'mostrami l'espresso', 'parlami del flat white'). La scheda contiene il configuratore (size/milk/sweetness) che l'utente DEVE poter usare prima dell'aggiunta al carrello. Restituisce la scheda completa di un prodotto: attributi (intensità, origine, note aromatiche, dietary, tag, time_of_day), disponibilità, alternative se esaurito, pairing consigliati, prodotti correlati (es. chicchi da asporto della stessa bevanda) e opzioni di personalizzazione (size, milk, sweetness). Usalo per ragionare su un singolo prodotto in dettaglio.",
       inputSchema: {
         type: "object",
         properties: {
@@ -490,7 +490,7 @@ export function buildTools(): Tool[] {
     {
       name: "add_to_cart",
       description:
-        "Aggiunge un prodotto al carrello in una certa quantità. Supporta options (size, milk, sweetness) se il prodotto le offre. Se il prodotto o l'opzione richiesta è ESAURITA, ritorna un errore strutturato con alternative coerenti che puoi proporre all'utente.",
+        "Aggiunge un prodotto al carrello in una certa quantità. Per prodotti con opzioni di personalizzazione (caffè, cappuccino, espresso, latte macchiato, etc.), USA PRIMA `get_product` per mostrare la scheda con configuratore. Chiama `add_to_cart` direttamente solo (a) dopo che l'utente ha confermato esplicitamente la configurazione tramite la scheda, oppure (b) per prodotti senza opzioni (food, beans, capsule). Supporta options (size, milk, sweetness) se il prodotto le offre. Se il prodotto o l'opzione richiesta è ESAURITA, ritorna un errore strutturato con alternative coerenti che puoi proporre all'utente.",
       inputSchema: {
         type: "object",
         properties: {
