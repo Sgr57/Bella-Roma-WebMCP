@@ -6,6 +6,17 @@ import {
   type SweetnessOption,
 } from "./products";
 import { defaultOptionsFor, useCartStore } from "../store/cart";
+import {
+  buildCart,
+  buildMutationResult,
+  buildProductCard,
+  buildProductList,
+  CART_SCHEMA,
+  MUTATION_RESULT_SCHEMA,
+  PRODUCT_CARD_SCHEMA,
+  PRODUCT_LIST_SCHEMA,
+  type ErrorCode,
+} from "./webmcp-schemas";
 
 const MAX_LINE_QUANTITY = 10;
 
@@ -42,25 +53,14 @@ function validateQuantity(
 }
 
 type TextBlock = { type: "text"; text: string };
-type ResourceLinkBlock = {
-  type: "resource_link";
-  uri: string;
-  name: string;
-  description?: string;
-  mimeType?: string;
-};
 
-export type ContentBlock = TextBlock | ResourceLinkBlock;
+export type ContentBlock = TextBlock;
 
 export type ToolResult = {
   content: ContentBlock[];
+  structuredContent?: Record<string, unknown>;
   isError?: boolean;
 };
-
-// cdn.jsdelivr.net è nella CSP img-src degli iframe MCP App di Claude Desktop;
-// il dominio Vercel non lo è. Asset serviti da questo repo via jsdelivr.
-const IMAGE_BASE_URL =
-  "https://cdn.jsdelivr.net/gh/Sgr57/Bella-Roma-WebMCP@main/public/products/editorial";
 
 export type Agent = {
   requestUserInteraction?: <T>(fn: () => Promise<T> | T) => Promise<T>;
@@ -70,28 +70,14 @@ export type Tool = {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
   execute: (args: Record<string, unknown>, agent?: Agent) => Promise<ToolResult>;
 };
 
-function ok(text: string): ToolResult {
-  return { content: [{ type: "text", text }] };
-}
 function err(text: string): ToolResult {
   return { content: [{ type: "text", text }], isError: true };
 }
 
-function formatAlternatives(ids?: string[]): string {
-  if (!ids || ids.length === 0) return "";
-  const labels = ids
-    .map((id) => {
-      const p = getProductById(id);
-      if (!p) return id;
-      const mod = p.price > 0 ? ` (+€${p.price.toFixed(2)})` : "";
-      return `${p.name} (${p.id})${mod}`;
-    })
-    .join(", ");
-  return ` Alternative simili: ${labels}.`;
-}
 
 function formatOptionsLabel(o?: {
   size?: SizeOption;
@@ -109,23 +95,58 @@ function formatOptionsLabel(o?: {
   return bits.length ? ` (${bits.join(", ")})` : "";
 }
 
-function formatLine(item: {
-  productId: string;
-  quantity: number;
-  options?: { size?: SizeOption; milk?: string; sweetness?: SweetnessOption };
-}): string {
-  const p = getProductById(item.productId);
-  if (!p) return `${item.productId} x${item.quantity}`;
-  const opts = formatOptionsLabel(item.options);
-  let unit = p.price;
-  if (item.options?.size && p.options?.size?.price_modifier) {
-    unit += p.options.size.price_modifier[item.options.size] ?? 0;
+
+function summarizeQuery(args: Record<string, unknown>): string {
+  const bits: string[] = [];
+  for (const [k, v] of Object.entries(args)) {
+    if (v === undefined || v === null) continue;
+    if (Array.isArray(v) && v.length === 0) continue;
+    bits.push(`${k}=${Array.isArray(v) ? v.join("|") : v}`);
   }
-  if (item.options?.milk) {
-    const m = getProductById(item.options.milk);
-    if (m) unit += m.price;
+  return bits.length ? bits.join(", ") : "tutti i prodotti";
+}
+
+function mutErr(
+  tool: string,
+  code: ErrorCode,
+  message: string,
+  alternatives?: Array<{ id: string; label: string; price_delta?: number }>,
+): ToolResult {
+  const error: { code: ErrorCode; message: string; alternatives?: typeof alternatives } = {
+    code,
+    message,
+  };
+  if (alternatives && alternatives.length > 0) error.alternatives = alternatives;
+  return {
+    content: [{ type: "text", text: message }],
+    structuredContent: buildMutationResult({ ok: false, tool, error }) as unknown as Record<string, unknown>,
+    isError: true,
+  };
+}
+
+function mutOk(tool: string, message: string): ToolResult {
+  return {
+    content: [{ type: "text", text: message }],
+    structuredContent: buildMutationResult({ ok: true, tool, message }) as unknown as Record<string, unknown>,
+  };
+}
+
+function altsFromProductIds(
+  ids: string[] | undefined,
+): Array<{ id: string; label: string; price_delta?: number }> {
+  if (!ids) return [];
+  const out: Array<{ id: string; label: string; price_delta?: number }> = [];
+  for (const id of ids) {
+    const p = getProductById(id);
+    if (!p) continue;
+    const entry: { id: string; label: string; price_delta?: number } = {
+      id: p.id,
+      label: p.name,
+    };
+    if (p.price > 0) entry.price_delta = p.price;
+    out.push(entry);
   }
-  return `${p.name} x${item.quantity}${opts} (€${(unit * item.quantity).toFixed(2)})`;
+  return out;
 }
 
 export function buildTools(): Tool[] {
@@ -133,7 +154,17 @@ export function buildTools(): Tool[] {
     {
       name: "search_products",
       description:
-        "Cerca prodotti nel catalogo (drink, food, beans, capsule). I prodotti di tipo milk_option sono esclusi di default — passa type:'milk_option' per includerli. Tutti i filtri sono in AND; tags/dietary/flavor_notes sono AND interno (il prodotto deve avere tutti i valori richiesti).",
+        "Cerca prodotti nel catalogo con filtri AND (testo, categoria, prezzo, tag,\n" +
+        "dietary, note aromatiche, origine, intensità, momento del giorno).\n" +
+        "Usalo quando l'utente chiede un'esplorazione (\"qualcosa di leggero\",\n" +
+        "\"cosa avete di vegano\") o lista per criteri.\n" +
+        "Output: structuredContent.kind=\"product_list\" con query_summary e items[]\n" +
+        "(ciascuno con image_url e has_customization). Renderizza come griglia\n" +
+        "markdown di card compatte (3-6 risultati max visibili: ![img], nome+prezzo,\n" +
+        "1 riga descrizione, chip principali). Se ci sono più di 6 risultati riassumi\n" +
+        "in fondo \"+N altri\" e proponi di restringere.\n" +
+        "Dopo: invita l'utente a scegliere uno per get_product, o aggiungere\n" +
+        "direttamente se has_customization=false.",
       inputSchema: {
         type: "object",
         properties: {
@@ -206,6 +237,7 @@ export function buildTools(): Tool[] {
           },
         },
       },
+      outputSchema: PRODUCT_LIST_SCHEMA,
       async execute(args) {
         const a = args as {
           query?: string;
@@ -260,32 +292,34 @@ export function buildTools(): Tool[] {
             return false;
           return true;
         });
-        const text = results.length
-          ? results
-              .map((p) => {
-                const bits = [
-                  `${p.name} (id: ${p.id}, ${p.category})`,
-                  typeof p.intensity === "number"
-                    ? `intensità ${p.intensity}/10`
-                    : null,
-                  p.origin ? p.origin : null,
-                  `€${p.price.toFixed(2)}`,
-                  p.available ? null : "ESAURITO",
-                ].filter(Boolean);
-                return `- ${bits.join(" — ")} — ${p.description}`;
-              })
-              .join("\n")
-          : "Nessun prodotto trovato.";
+        const querySummary = summarizeQuery(args);
+        const list = buildProductList(results, querySummary);
+        const summary = results.length
+          ? `${results.length} prodotti trovati per "${querySummary}"`
+          : `Nessun prodotto trovato per "${querySummary}"`;
         useCartStore
           .getState()
           .logToolCall("search_products", args, `${results.length} risultati`);
-        return ok(text);
+        return {
+          content: [{ type: "text", text: summary }],
+          structuredContent: list as unknown as Record<string, unknown>,
+        };
       },
     },
     {
       name: "get_product",
       description:
-        "Restituisce la scheda completa di un prodotto: attributi (intensità, origine, note aromatiche, dietary, tag, time_of_day), disponibilità, alternative se esaurito, pairing consigliati, prodotti correlati (es. chicchi da asporto della stessa bevanda) e opzioni di personalizzazione (size, milk, sweetness). Usalo per ragionare su un singolo prodotto in dettaglio.",
+        "Restituisce la scheda completa di un prodotto del catalogo Bella Roma.\n" +
+        "Usalo dopo search_products, o quando l'utente nomina un prodotto specifico\n" +
+        "(\"dimmi del cappuccino\", \"questo cos'è\").\n" +
+        "Output: structuredContent.kind=\"product_card\" con image_url, attributes\n" +
+        "(intensità/origine/note), customization (size/milk/sweetness con price_delta\n" +
+        "e available), pairings, related_products, next_actions. Renderizza come card\n" +
+        "markdown: ![immagine](image_url), titolo, prezzo, chip [intensità · origine ·\n" +
+        "dietary], descrizione, sezione \"Personalizza\" con opzioni numerate (mostra\n" +
+        "price_delta se > 0 e segnala ESAURITO con alternatives), CTA finale.\n" +
+        "Dopo: se customization è presente chiedi le scelte all'utente PRIMA di\n" +
+        "chiamare add_to_cart, usando args_template come baseline.",
       inputSchema: {
         type: "object",
         properties: {
@@ -293,105 +327,56 @@ export function buildTools(): Tool[] {
         },
         required: ["product_id"],
       },
+      outputSchema: PRODUCT_CARD_SCHEMA,
       async execute(args) {
         const a = args as { product_id?: unknown };
         if (typeof a.product_id !== "string" || a.product_id.length === 0) {
-          useCartStore.getState().logToolCall("get_product", args, "errore: product_id mancante");
+          useCartStore
+            .getState()
+            .logToolCall("get_product", args, "errore: product_id mancante");
           return err("Parametro 'product_id' obbligatorio (stringa non vuota).");
         }
-        const product_id = a.product_id;
-        const p = findProductCaseInsensitive(product_id);
+        const p = findProductCaseInsensitive(a.product_id);
         if (!p) {
           useCartStore
             .getState()
             .logToolCall("get_product", args, "non trovato");
-          return err(`Prodotto "${product_id}" non trovato.`);
+          return err(`Prodotto "${a.product_id}" non trovato.`);
         }
-        const lines: string[] = [];
-        lines.push(`# ${p.name} (${p.id})`);
-        lines.push(`Tipo: ${p.type} · Categoria: ${p.category}`);
-        lines.push(`Prezzo base: €${p.price.toFixed(2)}`);
-        if (typeof p.intensity === "number")
-          lines.push(`Intensità: ${p.intensity}/10`);
-        if (p.origin) lines.push(`Origine: ${p.origin}`);
-        if (p.flavor_notes?.length)
-          lines.push(`Note aromatiche: ${p.flavor_notes.join(", ")}`);
-        if (p.dietary?.length) lines.push(`Dietary: ${p.dietary.join(", ")}`);
-        if (p.temperature) lines.push(`Servizio: ${p.temperature}`);
-        if (p.time_of_day?.length)
-          lines.push(`Momento: ${p.time_of_day.join(", ")}`);
-        if (p.tags?.length) lines.push(`Tag: ${p.tags.join(", ")}`);
-        lines.push(`Disponibilità: ${p.available ? "disponibile" : "ESAURITO"}`);
-        if (!p.available && p.alternatives?.length) {
-          const altLabels = p.alternatives
-            .map((id) => {
-              const a = getProductById(id);
-              return a ? `${a.name} (${a.id})` : id;
-            })
-            .join(", ");
-          lines.push(`Alternative consigliate: ${altLabels}`);
-        }
-        if (p.pairings?.length) {
-          const ps = p.pairings
-            .map((id) => {
-              const x = getProductById(id);
-              return x ? `${x.name} (${x.id})` : id;
-            })
-            .join(", ");
-          lines.push(`Pairing consigliati: ${ps}`);
-        }
-        if (p.related_products?.length) {
-          const rs = p.related_products
-            .map((id) => {
-              const x = getProductById(id);
-              return x ? `${x.name} (${x.id})` : id;
-            })
-            .join(", ");
-          lines.push(`Prodotti correlati: ${rs}`);
-        }
-        if (p.options) {
-          lines.push("Opzioni:");
-          if (p.options.size) {
-            const sz = p.options.size;
-            const mods = sz.values
-              .map(
-                (v) =>
-                  `${v}${sz.price_modifier[v] ? ` (+€${sz.price_modifier[v]?.toFixed(2)})` : ""}`,
-              )
-              .join(", ");
-            lines.push(`  - size: ${mods} · default ${sz.default}`);
-          }
-          if (p.options.milk) {
-            const milkLabels = p.options.milk.values
-              .map((id) => {
-                const m = getProductById(id);
-                if (!m) return id;
-                const avail = m.available ? "" : " [ESAURITO]";
-                const mod = m.price > 0 ? ` (+€${m.price.toFixed(2)})` : "";
-                return `${m.name} (${m.id})${mod}${avail}`;
-              })
-              .join(", ");
-            lines.push(
-              `  - milk: ${milkLabels} · default ${p.options.milk.default}`,
-            );
-          }
-          if (p.options.sweetness) {
-            lines.push(
-              `  - sweetness: ${p.options.sweetness.values.join(", ")} · default ${p.options.sweetness.default}`,
-            );
-          }
-        }
-        const text = lines.join("\n");
+        const card = buildProductCard(p);
+        const summary = [
+          `${p.name} — €${p.price.toFixed(2)}`,
+          p.origin,
+          typeof p.intensity === "number" ? `intensità ${p.intensity}/10` : null,
+          p.options
+            ? `${
+                Object.keys(card.product.customization ?? {}).length
+              } opzioni di personalizzazione`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" — ");
         useCartStore
           .getState()
           .logToolCall("get_product", args, `${p.id} (${p.type})`);
-        return ok(text);
+        return {
+          content: [{ type: "text", text: summary }],
+          structuredContent: card as unknown as Record<string, unknown>,
+        };
       },
     },
     {
       name: "add_to_cart",
       description:
-        "Aggiunge un prodotto al carrello in una certa quantità. Supporta options (size, milk, sweetness) se il prodotto le offre. Se il prodotto o l'opzione richiesta è ESAURITA, ritorna un errore strutturato con alternative coerenti che puoi proporre all'utente.",
+        "Aggiunge una riga al carrello con quantità e opzioni scelte.\n" +
+        "Usalo SOLO dopo che l'utente ha confermato le opzioni di customization\n" +
+        "(quando esistono). Se l'utente dice solo \"aggiungi cappuccino\" e il prodotto\n" +
+        "ha customization, chiedi prima latte/size/zucchero invece di assumere i default.\n" +
+        "Output: structuredContent.kind=\"mutation_result\" con ok, message, e cart\n" +
+        "ricalcolato. Renderizza il message in 1 riga + la card del carrello aggiornata\n" +
+        "(no doppia get_cart). In caso di ok=false leggi error.code e error.alternatives\n" +
+        "per proporre rimpiazzi.\n" +
+        "Dopo: chiedi se vuole completare con checkout o continuare a curiosare.",
       inputSchema: {
         type: "object",
         properties: {
@@ -411,6 +396,7 @@ export function buildTools(): Tool[] {
         },
         required: ["product_id", "quantity"],
       },
+      outputSchema: MUTATION_RESULT_SCHEMA,
       async execute(args) {
         const a = args as {
           product_id?: unknown;
@@ -418,125 +404,116 @@ export function buildTools(): Tool[] {
           options?: { size?: SizeOption; milk?: string; sweetness?: SweetnessOption };
         };
         if (typeof a.product_id !== "string" || a.product_id.length === 0) {
-          useCartStore
-            .getState()
-            .logToolCall("add_to_cart", args, "errore: product_id mancante");
-          return err("Parametro 'product_id' obbligatorio (stringa non vuota).");
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: product_id mancante");
+          return mutErr("add_to_cart", "product_not_found", "Parametro 'product_id' obbligatorio.");
         }
         const product_id = a.product_id;
         const qCheck = validateQuantity(a.quantity);
         if (!qCheck.ok) {
           useCartStore.getState().logToolCall("add_to_cart", args, `errore: ${qCheck.message}`);
-          return err(qCheck.message);
+          return mutErr("add_to_cart", "quantity_out_of_range", qCheck.message);
         }
         const quantity = qCheck.value;
         const options = a.options;
         const product = findProductCaseInsensitive(product_id);
         if (!product) {
-          useCartStore
-            .getState()
-            .logToolCall("add_to_cart", args, "errore: prodotto non trovato");
-          return err(`Prodotto "${product_id}" non trovato.`);
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: prodotto non trovato");
+          return mutErr("add_to_cart", "product_not_found", `Prodotto "${product_id}" non trovato.`);
         }
         if (product.type === "milk_option") {
-          useCartStore
-            .getState()
-            .logToolCall("add_to_cart", args, "errore: milk_option non vendibile");
-          return err(
-            `"${product.name}" è un modificatore latte, non vendibile da solo. Usalo come options.milk su una bevanda.`,
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: milk_option non vendibile");
+          return mutErr(
+            "add_to_cart",
+            "invalid_option",
+            `"${product.name}" è un modificatore latte, non vendibile da solo. Usalo come options.milk.`,
           );
         }
         if (!product.available) {
-          const altText = formatAlternatives(product.alternatives);
-          const msg = `Prodotto "${product.name}" ESAURITO.${altText}`;
           useCartStore.getState().logToolCall("add_to_cart", args, "errore: esaurito");
-          return err(msg);
+          return mutErr(
+            "add_to_cart",
+            "out_of_stock",
+            `Prodotto "${product.name}" esaurito.`,
+            altsFromProductIds(product.alternatives),
+          );
         }
-        const existingQty = useCartStore
-          .getState()
-          .quantityFor(product.id, options);
+        const existingQty = useCartStore.getState().quantityFor(product.id, options);
         if (existingQty + quantity > MAX_LINE_QUANTITY) {
-          const msg = `Limite di ${MAX_LINE_QUANTITY} per riga: ne hai già ${existingQty}, puoi aggiungerne al massimo ${MAX_LINE_QUANTITY - existingQty}.`;
-          useCartStore
-            .getState()
-            .logToolCall("add_to_cart", args, "errore: limite riga superato");
-          return err(msg);
+          const remaining = MAX_LINE_QUANTITY - existingQty;
+          const msg = `Limite di ${MAX_LINE_QUANTITY} per riga: ne hai già ${existingQty}, puoi aggiungerne al massimo ${remaining}.`;
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: limite riga superato");
+          return mutErr("add_to_cart", "line_quantity_limit", msg);
         }
-        if (options?.size) {
-          if (!product.options?.size?.values.includes(options.size)) {
-            useCartStore
-              .getState()
-              .logToolCall("add_to_cart", args, "errore: size non offerta");
-            return err(
-              `Il prodotto "${product.name}" non offre la dimensione "${options.size}".`,
-            );
-          }
+        if (options?.size && !product.options?.size?.values.includes(options.size)) {
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: size non offerta");
+          return mutErr(
+            "add_to_cart",
+            "invalid_option",
+            `Il prodotto "${product.name}" non offre la dimensione "${options.size}".`,
+          );
         }
-        if (options?.sweetness) {
-          if (!product.options?.sweetness?.values.includes(options.sweetness)) {
-            useCartStore
-              .getState()
-              .logToolCall("add_to_cart", args, "errore: sweetness non offerta");
-            return err(
-              `Il prodotto "${product.name}" non offre il livello di zucchero "${options.sweetness}".`,
-            );
-          }
+        if (options?.sweetness && !product.options?.sweetness?.values.includes(options.sweetness)) {
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: sweetness non offerta");
+          return mutErr(
+            "add_to_cart",
+            "invalid_option",
+            `Il prodotto "${product.name}" non offre il livello di zucchero "${options.sweetness}".`,
+          );
         }
         if (options?.milk) {
           if (!product.options?.milk?.values.includes(options.milk)) {
-            useCartStore
-              .getState()
-              .logToolCall("add_to_cart", args, "errore: milk non offerto");
-            return err(
+            useCartStore.getState().logToolCall("add_to_cart", args, "errore: milk non offerto");
+            return mutErr(
+              "add_to_cart",
+              "invalid_option",
               `Il prodotto "${product.name}" non offre l'opzione latte "${options.milk}".`,
             );
           }
           const milkProduct = getProductById(options.milk);
           if (!milkProduct) {
-            return err(`Opzione latte "${options.milk}" sconosciuta.`);
+            return mutErr("add_to_cart", "invalid_option", `Opzione latte "${options.milk}" sconosciuta.`);
           }
           if (!milkProduct.available) {
-            const altText = formatAlternatives(milkProduct.alternatives);
-            const msg = `Opzione latte "${milkProduct.name}" ESAURITA.${altText}`;
-            useCartStore
-              .getState()
-              .logToolCall("add_to_cart", args, "errore: milk esaurito");
-            return err(msg);
+            useCartStore.getState().logToolCall("add_to_cart", args, "errore: milk esaurito");
+            return mutErr(
+              "add_to_cart",
+              "out_of_stock",
+              `Opzione latte "${milkProduct.name}" esaurita.`,
+              altsFromProductIds(milkProduct.alternatives),
+            );
           }
         }
-        const okAdd = useCartStore
-          .getState()
-          .addItem(product.id, quantity, options);
+        const okAdd = useCartStore.getState().addItem(product.id, quantity, options);
         if (!okAdd) {
-          useCartStore
-            .getState()
-            .logToolCall("add_to_cart", args, "errore generico");
-          return err(`Impossibile aggiungere "${product_id}".`);
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore generico");
+          return mutErr("add_to_cart", "invalid_option", `Impossibile aggiungere "${product_id}".`);
         }
         const effective = { ...defaultOptionsFor(product.id), ...options };
         const optsLabel = formatOptionsLabel(effective);
         const totalQty = useCartStore.getState().quantityFor(product.id, options);
-        const mergeNote =
-          existingQty > 0
-            ? ` (riga ora x${totalQty}, era x${existingQty})`
-            : "";
+        const mergeNote = existingQty > 0 ? ` (riga ora x${totalQty})` : "";
         const msg = `Aggiunto: ${product.name} x${quantity}${optsLabel}${mergeNote}.`;
         useCartStore.getState().logToolCall("add_to_cart", args, msg);
-        return ok(msg);
+        return mutOk("add_to_cart", msg);
       },
     },
     {
       name: "remove_from_cart",
       description:
-        "Rimuove una riga dal carrello. Passa anche 'options' (size/milk/sweetness) se il carrello contiene più righe dello stesso prodotto con opzioni diverse, altrimenti viene rimossa la prima riga che combacia con il product_id.",
+        "Rimuove una riga dal carrello.\n" +
+        "Usalo quando l'utente dice \"togli\", \"rimuovi\", \"non lo voglio più\".\n" +
+        "Passa anche 'options' se ci sono più righe dello stesso prodotto con opzioni\n" +
+        "diverse, altrimenti viene rimossa la prima che combacia con product_id.\n" +
+        "Output: structuredContent.kind=\"mutation_result\" con ok, message, cart.\n" +
+        "Renderizza il message + la card carrello aggiornata.\n" +
+        "Dopo: se il carrello è ora vuoto invita a esplorare con search_products.",
       inputSchema: {
         type: "object",
         properties: {
           product_id: { type: "string" },
           options: {
             type: "object",
-            description:
-              "Opzioni per disambiguare quale riga rimuovere (size/milk/sweetness).",
+            description: "Opzioni per disambiguare quale riga rimuovere (size/milk/sweetness).",
             properties: {
               size: { type: "string", enum: ["S", "M", "L"] },
               milk: { type: "string" },
@@ -546,182 +523,164 @@ export function buildTools(): Tool[] {
         },
         required: ["product_id"],
       },
+      outputSchema: MUTATION_RESULT_SCHEMA,
       async execute(args) {
         const a = args as {
           product_id?: unknown;
           options?: { size?: SizeOption; milk?: string; sweetness?: SweetnessOption };
         };
         if (typeof a.product_id !== "string" || a.product_id.length === 0) {
-          useCartStore
-            .getState()
-            .logToolCall("remove_from_cart", args, "errore: product_id mancante");
-          return err("Parametro 'product_id' obbligatorio (stringa non vuota).");
+          useCartStore.getState().logToolCall("remove_from_cart", args, "errore: product_id mancante");
+          return mutErr("remove_from_cart", "product_not_found", "Parametro 'product_id' obbligatorio.");
         }
-        const product_id = a.product_id;
-        const product = findProductCaseInsensitive(product_id);
-        const canonicalId = product?.id ?? product_id;
-        const removed = useCartStore
-          .getState()
-          .removeItem(canonicalId, a.options);
+        const product = findProductCaseInsensitive(a.product_id);
+        const canonicalId = product?.id ?? a.product_id;
+        const removed = useCartStore.getState().removeItem(canonicalId, a.options);
         if (!removed) {
-          useCartStore
-            .getState()
-            .logToolCall("remove_from_cart", args, "non era nel carrello");
-          return err(`"${product_id}" non era nel carrello.`);
+          useCartStore.getState().logToolCall("remove_from_cart", args, "non era nel carrello");
+          return mutErr("remove_from_cart", "not_in_cart", `"${a.product_id}" non era nel carrello.`);
         }
         const remaining = useCartStore.getState().quantityFor(canonicalId);
         const tail = remaining > 0 ? ` Restano ${remaining} unità con opzioni diverse.` : "";
         const msg = `Rimosso "${canonicalId}" dal carrello.${tail}`;
         useCartStore.getState().logToolCall("remove_from_cart", args, msg);
-        return ok(msg);
+        return mutOk("remove_from_cart", msg);
       },
     },
     {
       name: "apply_coupon",
       description:
-        "Applica un codice sconto al carrello. Codici disponibili: BENVENUTO (10%), STUDENTI (20% max €5). Se un coupon era già attivo viene sovrascritto e segnalato nel messaggio.",
+        "Applica un codice sconto al carrello (BENVENUTO 10%, STUDENTI 20% max €5).\n" +
+        "Usalo quando l'utente dice \"applica\", \"ho un coupon\", \"sconto\".\n" +
+        "Sovrascrive un coupon precedente se presente (lo segnala nel message).\n" +
+        "Output: structuredContent.kind=\"mutation_result\" con cart.coupon popolato.\n" +
+        "Renderizza il message + la card carrello con la riga sconto visibile.\n" +
+        "Dopo: se il carrello è vuoto avvisa che lo sconto scatterà al primo prodotto.",
       inputSchema: {
         type: "object",
-        properties: {
-          code: { type: "string" },
-        },
+        properties: { code: { type: "string" } },
         required: ["code"],
       },
+      outputSchema: MUTATION_RESULT_SCHEMA,
       async execute(args) {
         const a = args as { code?: unknown };
         if (typeof a.code !== "string" || a.code.trim().length === 0) {
           useCartStore.getState().logToolCall("apply_coupon", args, "errore: code mancante");
-          return err("Parametro 'code' obbligatorio (stringa non vuota).");
+          return mutErr("apply_coupon", "invalid_coupon", "Parametro 'code' obbligatorio.");
         }
         const code = a.code;
         const result = useCartStore.getState().applyCoupon(code);
         if (!result.ok) {
           useCartStore.getState().logToolCall("apply_coupon", args, "non valido");
           const available = Object.keys(COUPONS).join(", ");
-          return err(`Coupon "${code}" non valido. Disponibili: ${available}.`);
+          return mutErr(
+            "apply_coupon",
+            "invalid_coupon",
+            `Coupon "${code}" non valido. Disponibili: ${available}.`,
+          );
         }
-        const overwrite = result.previous
-          ? ` (sostituisce ${result.previous})`
-          : "";
+        const overwrite = result.previous ? ` (sostituisce ${result.previous})` : "";
         const cartHint =
           useCartStore.getState().items.length === 0
             ? " Il carrello è vuoto: lo sconto sarà attivo al primo prodotto aggiunto."
             : "";
         const msg = `Coupon ${code.toUpperCase()} applicato${overwrite}.${cartHint}`;
         useCartStore.getState().logToolCall("apply_coupon", args, msg);
-        return ok(msg);
+        return mutOk("apply_coupon", msg);
       },
     },
     {
       name: "remove_coupon",
       description:
-        "Rimuove il coupon attualmente applicato al carrello. Non rimuove i prodotti.",
+        "Rimuove il coupon attualmente applicato al carrello (non rimuove prodotti).\n" +
+        "Usalo quando l'utente dice \"togli lo sconto\", \"rimuovi il coupon\".\n" +
+        "Output: structuredContent.kind=\"mutation_result\" con cart.coupon=null.\n" +
+        "Renderizza il message in 1 riga + la card carrello senza riga sconto.\n" +
+        "Dopo: se l'utente ha un altro codice proponi apply_coupon.",
       inputSchema: { type: "object", properties: {} },
+      outputSchema: MUTATION_RESULT_SCHEMA,
       async execute() {
         const had = useCartStore.getState().clearCoupon();
-        const msg = had
-          ? "Coupon rimosso."
-          : "Nessun coupon era applicato.";
+        const msg = had ? "Coupon rimosso." : "Nessun coupon era applicato.";
         useCartStore.getState().logToolCall("remove_coupon", {}, msg);
-        return ok(msg);
+        return mutOk("remove_coupon", msg);
       },
     },
     {
       name: "clear_cart",
       description:
-        "Svuota completamente il carrello e rimuove il coupon. Usalo quando l'utente vuole ricominciare da zero.",
+        "Svuota completamente il carrello e rimuove il coupon.\n" +
+        "Usalo quando l'utente vuole ricominciare da zero (\"cancella tutto\",\n" +
+        "\"svuota\", \"resetta\").\n" +
+        "Output: structuredContent.kind=\"mutation_result\" con cart.empty=true.\n" +
+        "Renderizza il message in 1 riga + la card carrello vuota.\n" +
+        "Dopo: invita a esplorare di nuovo con search_products.",
       inputSchema: { type: "object", properties: {} },
+      outputSchema: MUTATION_RESULT_SCHEMA,
       async execute() {
         const s = useCartStore.getState();
         const hadItems = s.items.length;
         const hadCoupon = s.coupon !== null;
         s.clearCart();
-        const msg = hadItems === 0 && !hadCoupon
-          ? "Carrello già vuoto."
-          : `Carrello svuotato (${hadItems} righe rimosse${hadCoupon ? " + coupon rimosso" : ""}).`;
+        const msg =
+          hadItems === 0 && !hadCoupon
+            ? "Carrello già vuoto."
+            : `Carrello svuotato (${hadItems} righe rimosse${hadCoupon ? " + coupon rimosso" : ""}).`;
         useCartStore.getState().logToolCall("clear_cart", {}, msg);
-        return ok(msg);
+        return mutOk("clear_cart", msg);
       },
     },
     {
       name: "get_cart",
-      description: "Ritorna il contenuto corrente del carrello con totali.",
-      inputSchema: { type: "object", properties: {} },
-      async execute() {
-        const s = useCartStore.getState();
-        if (s.items.length === 0) {
-          useCartStore.getState().logToolCall("get_cart", {}, "vuoto");
-          return ok("Il carrello è vuoto.");
-        }
-        const lines = s.items.map((it) => `- ${formatLine(it)}`);
-        const summary = [
-          ...lines,
-          `Subtotale: €${s.subtotal().toFixed(2)}`,
-          s.coupon
-            ? `Sconto (${s.coupon}): -€${s.discount().toFixed(2)}`
-            : "Nessun coupon applicato",
-          `Totale: €${s.total().toFixed(2)}`,
-        ].join("\n");
-        useCartStore
-          .getState()
-          .logToolCall("get_cart", {}, `${s.items.length} righe`);
-        return ok(summary);
-      },
-    },
-    {
-      name: "show_product_image",
       description:
-        "Restituisce l'immagine editoriale del prodotto come MCP resource_link (URI pubblico HTTPS, WebP). Da usare quando l'utente chiede di 'vedere', 'mostrare', 'fammi vedere' un prodotto. Il client decide come renderizzare il link (inline preview vs widget). Non modifica lo stato.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          product_id: { type: "string", description: "L'id del prodotto" },
-        },
-        required: ["product_id"],
-      },
-      async execute(args) {
-        const a = args as { product_id?: unknown };
-        if (typeof a.product_id !== "string" || a.product_id.length === 0) {
-          useCartStore
-            .getState()
-            .logToolCall("show_product_image", args, "errore: product_id mancante");
-          return err("Parametro 'product_id' obbligatorio (stringa non vuota).");
-        }
-        const p = findProductCaseInsensitive(a.product_id);
-        if (!p) {
-          useCartStore
-            .getState()
-            .logToolCall("show_product_image", args, "non trovato");
-          return err(`Prodotto "${a.product_id}" non trovato.`);
-        }
-        const uri = `${IMAGE_BASE_URL}/${p.id}.webp`;
+        "Restituisce il contenuto corrente del carrello con totali e coupon.\n" +
+        "Usalo quando l'utente chiede \"cosa ho nel carrello\", \"quanto ho speso\",\n" +
+        "o serve riassumere lo stato prima di un suggerimento (\"cosa va bene con\n" +
+        "quello che ho?\").\n" +
+        "Output: structuredContent.kind=\"cart\" con lines (con options_label e\n" +
+        "line_total), subtotal/total, coupon (o null), empty, next_actions.\n" +
+        "Renderizza come card carrello: lista compatta righe (immagine, nome, qty,\n" +
+        "opzioni in 1 riga, prezzo), riga sconto se coupon != null, totale in grassetto.\n" +
+        "Dopo: se !empty proponi checkout o apply_coupon; se empty invita a esplorare\n" +
+        "con search_products.",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: CART_SCHEMA,
+      async execute() {
+        const cart = buildCart();
+        const summary = cart.empty
+          ? "Il carrello è vuoto."
+          : `Carrello: ${cart.lines.length} righe, totale €${cart.total.toFixed(2)}${
+              cart.coupon ? ` (sconto ${cart.coupon.code} -€${cart.coupon.discount.toFixed(2)})` : ""
+            }`;
         useCartStore
           .getState()
-          .logToolCall("show_product_image", args, `${p.id}.webp`);
+          .logToolCall("get_cart", {}, `${cart.lines.length} righe`);
         return {
-          content: [
-            { type: "text", text: `Immagine del prodotto ${p.name} (${p.id}).` },
-            {
-              type: "resource_link",
-              uri,
-              name: `${p.name} — immagine editoriale`,
-              description: `Foto editoriale di ${p.name}`,
-              mimeType: "image/webp",
-            },
-          ],
+          content: [{ type: "text", text: summary }],
+          structuredContent: cart as unknown as Record<string, unknown>,
         };
       },
     },
     {
       name: "checkout",
       description:
-        "Conferma l'ordine e completa il pagamento. Richiede conferma esplicita dell'utente.",
+        "Conferma l'ordine e completa il pagamento. Richiede conferma esplicita\n" +
+        "dell'utente tramite agent.requestUserInteraction.\n" +
+        "Usalo quando l'utente dice \"paga\", \"completa\", \"conferma l'ordine\".\n" +
+        "Output: structuredContent.kind=\"mutation_result\". ok=true con message di\n" +
+        "ricevuta e cart vuoto; ok=false con error.code (\"empty_cart\" o\n" +
+        "\"user_cancelled\") quando applicabile.\n" +
+        "Renderizza il message + se ok=true mostra un breve riepilogo ricevuta\n" +
+        "(totale pagato), se ok=false leggi error.code per spiegare cosa è successo.\n" +
+        "Dopo: se ok=true ringrazia e proponi di esplorare di nuovo con search_products;\n" +
+        "se user_cancelled chiedi se modificare l'ordine; se empty_cart invita ad aggiungere.",
       inputSchema: { type: "object", properties: {} },
+      outputSchema: MUTATION_RESULT_SCHEMA,
       async execute(_args, agent) {
         const s = useCartStore.getState();
         if (s.items.length === 0) {
           useCartStore.getState().logToolCall("checkout", {}, "carrello vuoto");
-          return err("Il carrello è vuoto, niente da pagare.");
+          return mutErr("checkout", "empty_cart", "Il carrello è vuoto, niente da pagare.");
         }
         const total = s.total();
         const { requestCheckoutConfirmation } = await import("./checkout-bridge");
@@ -730,15 +689,13 @@ export function buildTools(): Tool[] {
           ? await agent.requestUserInteraction(ask)
           : await ask();
         if (!confirmed) {
-          useCartStore
-            .getState()
-            .logToolCall("checkout", {}, "annullato dall'utente");
-          return ok("Pagamento annullato dall'utente.");
+          useCartStore.getState().logToolCall("checkout", {}, "annullato dall'utente");
+          return mutErr("checkout", "user_cancelled", "Pagamento annullato dall'utente.");
         }
         const result = useCartStore.getState().checkout();
         const msg = `Ordine confermato! Totale pagato: €${result.total.toFixed(2)}.`;
         useCartStore.getState().logToolCall("checkout", {}, msg);
-        return ok(msg);
+        return mutOk("checkout", msg);
       },
     },
   ];
