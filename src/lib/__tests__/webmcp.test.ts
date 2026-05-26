@@ -48,26 +48,60 @@ describe("WebMCP tools", () => {
   it("search_products returns all products when no filter", async () => {
     const res = await findTool("search_products").execute({}, fakeAgent);
     expect(res.isError).toBeFalsy();
-    const text = res.content[0].text;
-    expect(text).toContain("Espresso Classico");
+    const list = res.structuredContent as { items: Array<{ name: string }> };
+    expect(list.items.map((i) => i.name)).toContain("Espresso Classico");
   });
 
   it("search_products filters by category", async () => {
     const res = await findTool("search_products").execute(
       { category: "filtro" },
-      fakeAgent
+      fakeAgent,
     );
-    expect(res.content[0].text).toContain("Filtro Etiopia");
-    expect(res.content[0].text).not.toContain("Cappuccino");
+    const list = res.structuredContent as { items: Array<{ name: string }> };
+    const names = list.items.map((i) => i.name);
+    expect(names).toContain("Filtro Etiopia");
+    expect(names).not.toContain("Cappuccino");
   });
 
   it("search_products filters by max_price", async () => {
     const res = await findTool("search_products").execute(
       { max_price: 2 },
-      fakeAgent
+      fakeAgent,
     );
-    expect(res.content[0].text).toContain("Espresso Classico");
-    expect(res.content[0].text).not.toContain("Filtro Etiopia");
+    const list = res.structuredContent as { items: Array<{ name: string }> };
+    const names = list.items.map((i) => i.name);
+    expect(names).toContain("Espresso Classico");
+    expect(names).not.toContain("Filtro Etiopia");
+  });
+
+  it("search_products returns structuredContent product_list", async () => {
+    const res = await findTool("search_products").execute(
+      { category: "filtro" },
+      fakeAgent,
+    );
+    expect(res.structuredContent).toMatchObject({
+      kind: "product_list",
+      query_summary: expect.stringContaining("category=filtro"),
+      items: expect.arrayContaining([
+        expect.objectContaining({
+          id: "filtro-etiopia",
+          image_url: expect.stringContaining("/filtro-etiopia.webp"),
+          has_customization: false,
+        }),
+      ]),
+    });
+  });
+
+  it("search_products has_customization is true for items with options", async () => {
+    const res = await findTool("search_products").execute(
+      { query: "cappuccino" },
+      fakeAgent,
+    );
+    const list = res.structuredContent as {
+      items: Array<{ id: string; has_customization: boolean }>;
+    };
+    const cap = list.items.find((i) => i.id === "cappuccino");
+    expect(cap?.has_customization).toBe(true);
   });
 
   it("add_to_cart adds product and logs activity", async () => {
@@ -156,8 +190,11 @@ describe("WebMCP tools", () => {
 
   it("search_products excludes milk_option by default", async () => {
     const res = await findTool("search_products").execute({}, fakeAgent);
-    expect(res.content[0].text).not.toContain("milk-whole");
-    expect(res.content[0].text).not.toContain("Latte intero");
+    const list = res.structuredContent as { items: Array<{ id: string; name: string }> };
+    const ids = list.items.map((i) => i.id);
+    const names = list.items.map((i) => i.name);
+    expect(ids).not.toContain("milk-whole");
+    expect(names).not.toContain("Latte intero");
   });
 
   it("search_products filters by type=beans", async () => {
@@ -165,8 +202,10 @@ describe("WebMCP tools", () => {
       { type: "beans" },
       fakeAgent,
     );
-    expect(res.content[0].text).toContain("Chicchi Etiopia");
-    expect(res.content[0].text).not.toContain("Cappuccino");
+    const list = res.structuredContent as { items: Array<{ name: string }> };
+    const names = list.items.map((i) => i.name);
+    expect(names.some((n) => n.includes("Chicchi Etiopia"))).toBe(true);
+    expect(names).not.toContain("Cappuccino");
   });
 
   it("search_products filters by dietary contains all", async () => {
@@ -174,8 +213,10 @@ describe("WebMCP tools", () => {
       { dietary: ["no-caffeine"] },
       fakeAgent,
     );
-    expect(res.content[0].text).toContain("Decaffeinato");
-    expect(res.content[0].text).not.toContain("Espresso Classico");
+    const list = res.structuredContent as { items: Array<{ name: string }> };
+    const names = list.items.map((i) => i.name);
+    expect(names).toContain("Decaffeinato");
+    expect(names).not.toContain("Espresso Classico");
   });
 
   it("search_products filters by flavor_notes contains all", async () => {
@@ -183,8 +224,10 @@ describe("WebMCP tools", () => {
       { flavor_notes: ["fruity"] },
       fakeAgent,
     );
-    expect(res.content[0].text).toContain("Filtro Etiopia");
-    expect(res.content[0].text).not.toContain("Espresso Classico");
+    const list = res.structuredContent as { items: Array<{ name: string }> };
+    const names = list.items.map((i) => i.name);
+    expect(names).toContain("Filtro Etiopia");
+    expect(names).not.toContain("Espresso Classico");
   });
 
   it("search_products filters by intensity_max", async () => {
@@ -192,8 +235,10 @@ describe("WebMCP tools", () => {
       { intensity_max: 4 },
       fakeAgent,
     );
-    expect(res.content[0].text).toContain("Decaffeinato");
-    expect(res.content[0].text).not.toContain("Doppio Espresso");
+    const list = res.structuredContent as { items: Array<{ name: string }> };
+    const names = list.items.map((i) => i.name);
+    expect(names).toContain("Decaffeinato");
+    expect(names).not.toContain("Doppio Espresso");
   });
 
   it("search_products filters by origin", async () => {
@@ -201,9 +246,11 @@ describe("WebMCP tools", () => {
       { origin: "Etiopia" },
       fakeAgent,
     );
-    expect(res.content[0].text).toContain("Filtro Etiopia");
-    expect(res.content[0].text).toContain("Chicchi Etiopia");
-    expect(res.content[0].text).not.toContain("Cappuccino");
+    const list = res.structuredContent as { items: Array<{ name: string }> };
+    const names = list.items.map((i) => i.name);
+    expect(names).toContain("Filtro Etiopia");
+    expect(names.some((n) => n.includes("Chicchi Etiopia"))).toBe(true);
+    expect(names).not.toContain("Cappuccino");
   });
 
   it("search_products in_stock_only=true hides unavailable", async () => {
@@ -211,8 +258,10 @@ describe("WebMCP tools", () => {
       { type: "milk_option", in_stock_only: true },
       fakeAgent,
     );
-    expect(res.content[0].text).not.toContain("Latte di soia");
-    expect(res.content[0].text).toContain("Latte d'avena");
+    const list = res.structuredContent as { items: Array<{ name: string }> };
+    const names = list.items.map((i) => i.name);
+    expect(names).not.toContain("Latte di soia");
+    expect(names).toContain("Latte d'avena");
   });
 
   it("get_product returns rich details for existing product", async () => {

@@ -8,7 +8,9 @@ import {
 import { defaultOptionsFor, useCartStore } from "../store/cart";
 import {
   buildProductCard,
+  buildProductList,
   PRODUCT_CARD_SCHEMA,
+  PRODUCT_LIST_SCHEMA,
 } from "./webmcp-schemas";
 
 const MAX_LINE_QUANTITY = 10;
@@ -134,6 +136,16 @@ function formatLine(item: {
   return `${p.name} x${item.quantity}${opts} (€${(unit * item.quantity).toFixed(2)})`;
 }
 
+function summarizeQuery(args: Record<string, unknown>): string {
+  const bits: string[] = [];
+  for (const [k, v] of Object.entries(args)) {
+    if (v === undefined || v === null) continue;
+    if (Array.isArray(v) && v.length === 0) continue;
+    bits.push(`${k}=${Array.isArray(v) ? v.join("|") : v}`);
+  }
+  return bits.length ? bits.join(", ") : "tutti i prodotti";
+}
+
 export function buildTools(): Tool[] {
   return [
     {
@@ -160,7 +172,17 @@ export function buildTools(): Tool[] {
     {
       name: "search_products",
       description:
-        "Cerca prodotti nel catalogo (drink, food, beans, capsule). I prodotti di tipo milk_option sono esclusi di default — passa type:'milk_option' per includerli. Tutti i filtri sono in AND; tags/dietary/flavor_notes sono AND interno (il prodotto deve avere tutti i valori richiesti).",
+        "Cerca prodotti nel catalogo con filtri AND (testo, categoria, prezzo, tag,\n" +
+        "dietary, note aromatiche, origine, intensità, momento del giorno).\n" +
+        "Usalo quando l'utente chiede un'esplorazione (\"qualcosa di leggero\",\n" +
+        "\"cosa avete di vegano\") o lista per criteri.\n" +
+        "Output: structuredContent.kind=\"product_list\" con query_summary e items[]\n" +
+        "(ciascuno con image_url e has_customization). Renderizza come griglia\n" +
+        "markdown di card compatte (3-6 risultati max visibili: ![img], nome+prezzo,\n" +
+        "1 riga descrizione, chip principali). Se ci sono più di 6 risultati riassumi\n" +
+        "in fondo \"+N altri\" e proponi di restringere.\n" +
+        "Dopo: invita l'utente a scegliere uno per get_product, o aggiungere\n" +
+        "direttamente se has_customization=false.",
       inputSchema: {
         type: "object",
         properties: {
@@ -233,6 +255,7 @@ export function buildTools(): Tool[] {
           },
         },
       },
+      outputSchema: PRODUCT_LIST_SCHEMA,
       async execute(args) {
         const a = args as {
           query?: string;
@@ -287,26 +310,18 @@ export function buildTools(): Tool[] {
             return false;
           return true;
         });
-        const text = results.length
-          ? results
-              .map((p) => {
-                const bits = [
-                  `${p.name} (id: ${p.id}, ${p.category})`,
-                  typeof p.intensity === "number"
-                    ? `intensità ${p.intensity}/10`
-                    : null,
-                  p.origin ? p.origin : null,
-                  `€${p.price.toFixed(2)}`,
-                  p.available ? null : "ESAURITO",
-                ].filter(Boolean);
-                return `- ${bits.join(" — ")} — ${p.description}`;
-              })
-              .join("\n")
-          : "Nessun prodotto trovato.";
+        const querySummary = summarizeQuery(args);
+        const list = buildProductList(results, querySummary);
+        const summary = results.length
+          ? `${results.length} prodotti trovati per "${querySummary}"`
+          : `Nessun prodotto trovato per "${querySummary}"`;
         useCartStore
           .getState()
           .logToolCall("search_products", args, `${results.length} risultati`);
-        return ok(text);
+        return {
+          content: [{ type: "text", text: summary }],
+          structuredContent: list as unknown as Record<string, unknown>,
+        };
       },
     },
     {
