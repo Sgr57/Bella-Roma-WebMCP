@@ -237,6 +237,48 @@ describe("WebMCP tools", () => {
     expect(res.isError).toBe(true);
   });
 
+  it("apply_coupon returns mutation_result with coupon in embedded cart", async () => {
+    useCartStore.getState().addItem("espresso", 1);
+    const res = await findTool("apply_coupon").execute({ code: "BENVENUTO" }, fakeAgent);
+    expect(res.structuredContent).toMatchObject({
+      kind: "mutation_result",
+      ok: true,
+      tool: "apply_coupon",
+      cart: expect.objectContaining({
+        coupon: expect.objectContaining({ code: "BENVENUTO" }),
+      }),
+    });
+  });
+
+  it("apply_coupon returns error.code=invalid_coupon for unknown code", async () => {
+    const res = await findTool("apply_coupon").execute({ code: "INVALID" }, fakeAgent);
+    expect(res.structuredContent).toMatchObject({
+      ok: false,
+      error: expect.objectContaining({ code: "invalid_coupon" }),
+    });
+  });
+
+  it("remove_coupon returns mutation_result with coupon=null", async () => {
+    useCartStore.getState().addItem("espresso", 1);
+    await findTool("apply_coupon").execute({ code: "BENVENUTO" }, fakeAgent);
+    const res = await findTool("remove_coupon").execute({}, fakeAgent);
+    expect(res.structuredContent).toMatchObject({
+      ok: true,
+      tool: "remove_coupon",
+      cart: expect.objectContaining({ coupon: null }),
+    });
+  });
+
+  it("clear_cart returns mutation_result with empty cart", async () => {
+    await findTool("add_to_cart").execute({ product_id: "espresso", quantity: 1 }, fakeAgent);
+    const res = await findTool("clear_cart").execute({}, fakeAgent);
+    expect(res.structuredContent).toMatchObject({
+      ok: true,
+      tool: "clear_cart",
+      cart: expect.objectContaining({ empty: true }),
+    });
+  });
+
   it("get_cart returns current state", async () => {
     useCartStore.getState().addItem("espresso", 2);
     const res = await findTool("get_cart").execute({}, fakeAgent);

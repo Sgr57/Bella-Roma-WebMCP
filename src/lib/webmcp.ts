@@ -586,68 +586,84 @@ export function buildTools(): Tool[] {
     {
       name: "apply_coupon",
       description:
-        "Applica un codice sconto al carrello. Codici disponibili: BENVENUTO (10%), STUDENTI (20% max €5). Se un coupon era già attivo viene sovrascritto e segnalato nel messaggio.",
+        "Applica un codice sconto al carrello (BENVENUTO 10%, STUDENTI 20% max €5).\n" +
+        "Usalo quando l'utente dice \"applica\", \"ho un coupon\", \"sconto\".\n" +
+        "Sovrascrive un coupon precedente se presente (lo segnala nel message).\n" +
+        "Output: structuredContent.kind=\"mutation_result\" con cart.coupon popolato.\n" +
+        "Renderizza il message + la card carrello con la riga sconto visibile.\n" +
+        "Dopo: se il carrello è vuoto avvisa che lo sconto scatterà al primo prodotto.",
       inputSchema: {
         type: "object",
-        properties: {
-          code: { type: "string" },
-        },
+        properties: { code: { type: "string" } },
         required: ["code"],
       },
+      outputSchema: MUTATION_RESULT_SCHEMA,
       async execute(args) {
         const a = args as { code?: unknown };
         if (typeof a.code !== "string" || a.code.trim().length === 0) {
           useCartStore.getState().logToolCall("apply_coupon", args, "errore: code mancante");
-          return err("Parametro 'code' obbligatorio (stringa non vuota).");
+          return mutErr("apply_coupon", "invalid_coupon", "Parametro 'code' obbligatorio.");
         }
         const code = a.code;
         const result = useCartStore.getState().applyCoupon(code);
         if (!result.ok) {
           useCartStore.getState().logToolCall("apply_coupon", args, "non valido");
           const available = Object.keys(COUPONS).join(", ");
-          return err(`Coupon "${code}" non valido. Disponibili: ${available}.`);
+          return mutErr(
+            "apply_coupon",
+            "invalid_coupon",
+            `Coupon "${code}" non valido. Disponibili: ${available}.`,
+          );
         }
-        const overwrite = result.previous
-          ? ` (sostituisce ${result.previous})`
-          : "";
+        const overwrite = result.previous ? ` (sostituisce ${result.previous})` : "";
         const cartHint =
           useCartStore.getState().items.length === 0
             ? " Il carrello è vuoto: lo sconto sarà attivo al primo prodotto aggiunto."
             : "";
         const msg = `Coupon ${code.toUpperCase()} applicato${overwrite}.${cartHint}`;
         useCartStore.getState().logToolCall("apply_coupon", args, msg);
-        return ok(msg);
+        return mutOk("apply_coupon", msg);
       },
     },
     {
       name: "remove_coupon",
       description:
-        "Rimuove il coupon attualmente applicato al carrello. Non rimuove i prodotti.",
+        "Rimuove il coupon attualmente applicato al carrello (non rimuove prodotti).\n" +
+        "Usalo quando l'utente dice \"togli lo sconto\", \"rimuovi il coupon\".\n" +
+        "Output: structuredContent.kind=\"mutation_result\" con cart.coupon=null.\n" +
+        "Renderizza il message in 1 riga + la card carrello senza riga sconto.\n" +
+        "Dopo: se l'utente ha un altro codice proponi apply_coupon.",
       inputSchema: { type: "object", properties: {} },
+      outputSchema: MUTATION_RESULT_SCHEMA,
       async execute() {
         const had = useCartStore.getState().clearCoupon();
-        const msg = had
-          ? "Coupon rimosso."
-          : "Nessun coupon era applicato.";
+        const msg = had ? "Coupon rimosso." : "Nessun coupon era applicato.";
         useCartStore.getState().logToolCall("remove_coupon", {}, msg);
-        return ok(msg);
+        return mutOk("remove_coupon", msg);
       },
     },
     {
       name: "clear_cart",
       description:
-        "Svuota completamente il carrello e rimuove il coupon. Usalo quando l'utente vuole ricominciare da zero.",
+        "Svuota completamente il carrello e rimuove il coupon.\n" +
+        "Usalo quando l'utente vuole ricominciare da zero (\"cancella tutto\",\n" +
+        "\"svuota\", \"resetta\").\n" +
+        "Output: structuredContent.kind=\"mutation_result\" con cart.empty=true.\n" +
+        "Renderizza il message in 1 riga + la card carrello vuota.\n" +
+        "Dopo: invita a esplorare di nuovo con search_products.",
       inputSchema: { type: "object", properties: {} },
+      outputSchema: MUTATION_RESULT_SCHEMA,
       async execute() {
         const s = useCartStore.getState();
         const hadItems = s.items.length;
         const hadCoupon = s.coupon !== null;
         s.clearCart();
-        const msg = hadItems === 0 && !hadCoupon
-          ? "Carrello già vuoto."
-          : `Carrello svuotato (${hadItems} righe rimosse${hadCoupon ? " + coupon rimosso" : ""}).`;
+        const msg =
+          hadItems === 0 && !hadCoupon
+            ? "Carrello già vuoto."
+            : `Carrello svuotato (${hadItems} righe rimosse${hadCoupon ? " + coupon rimosso" : ""}).`;
         useCartStore.getState().logToolCall("clear_cart", {}, msg);
-        return ok(msg);
+        return mutOk("clear_cart", msg);
       },
     },
     {
