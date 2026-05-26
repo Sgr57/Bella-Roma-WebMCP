@@ -6,6 +6,10 @@ import {
   type SweetnessOption,
 } from "./products";
 import { defaultOptionsFor, useCartStore } from "../store/cart";
+import {
+  buildProductCard,
+  PRODUCT_CARD_SCHEMA,
+} from "./webmcp-schemas";
 
 const MAX_LINE_QUANTITY = 10;
 
@@ -308,7 +312,17 @@ export function buildTools(): Tool[] {
     {
       name: "get_product",
       description:
-        "Restituisce la scheda completa di un prodotto: attributi (intensità, origine, note aromatiche, dietary, tag, time_of_day), disponibilità, alternative se esaurito, pairing consigliati, prodotti correlati (es. chicchi da asporto della stessa bevanda) e opzioni di personalizzazione (size, milk, sweetness). Usalo per ragionare su un singolo prodotto in dettaglio.",
+        "Restituisce la scheda completa di un prodotto del catalogo Bella Roma.\n" +
+        "Usalo dopo search_products, o quando l'utente nomina un prodotto specifico\n" +
+        "(\"dimmi del cappuccino\", \"questo cos'è\").\n" +
+        "Output: structuredContent.kind=\"product_card\" con image_url, attributes\n" +
+        "(intensità/origine/note), customization (size/milk/sweetness con price_delta\n" +
+        "e available), pairings, related_products, next_actions. Renderizza come card\n" +
+        "markdown: ![immagine](image_url), titolo, prezzo, chip [intensità · origine ·\n" +
+        "dietary], descrizione, sezione \"Personalizza\" con opzioni numerate (mostra\n" +
+        "price_delta se > 0 e segnala ESAURITO con alternatives), CTA finale.\n" +
+        "Dopo: se customization è presente chiedi le scelte all'utente PRIMA di\n" +
+        "chiamare add_to_cart, usando args_template come baseline.",
       inputSchema: {
         type: "object",
         properties: {
@@ -316,99 +330,42 @@ export function buildTools(): Tool[] {
         },
         required: ["product_id"],
       },
+      outputSchema: PRODUCT_CARD_SCHEMA,
       async execute(args) {
         const a = args as { product_id?: unknown };
         if (typeof a.product_id !== "string" || a.product_id.length === 0) {
-          useCartStore.getState().logToolCall("get_product", args, "errore: product_id mancante");
+          useCartStore
+            .getState()
+            .logToolCall("get_product", args, "errore: product_id mancante");
           return err("Parametro 'product_id' obbligatorio (stringa non vuota).");
         }
-        const product_id = a.product_id;
-        const p = findProductCaseInsensitive(product_id);
+        const p = findProductCaseInsensitive(a.product_id);
         if (!p) {
           useCartStore
             .getState()
             .logToolCall("get_product", args, "non trovato");
-          return err(`Prodotto "${product_id}" non trovato.`);
+          return err(`Prodotto "${a.product_id}" non trovato.`);
         }
-        const lines: string[] = [];
-        lines.push(`# ${p.name} (${p.id})`);
-        lines.push(`Tipo: ${p.type} · Categoria: ${p.category}`);
-        lines.push(`Prezzo base: €${p.price.toFixed(2)}`);
-        if (typeof p.intensity === "number")
-          lines.push(`Intensità: ${p.intensity}/10`);
-        if (p.origin) lines.push(`Origine: ${p.origin}`);
-        if (p.flavor_notes?.length)
-          lines.push(`Note aromatiche: ${p.flavor_notes.join(", ")}`);
-        if (p.dietary?.length) lines.push(`Dietary: ${p.dietary.join(", ")}`);
-        if (p.temperature) lines.push(`Servizio: ${p.temperature}`);
-        if (p.time_of_day?.length)
-          lines.push(`Momento: ${p.time_of_day.join(", ")}`);
-        if (p.tags?.length) lines.push(`Tag: ${p.tags.join(", ")}`);
-        lines.push(`Disponibilità: ${p.available ? "disponibile" : "ESAURITO"}`);
-        if (!p.available && p.alternatives?.length) {
-          const altLabels = p.alternatives
-            .map((id) => {
-              const a = getProductById(id);
-              return a ? `${a.name} (${a.id})` : id;
-            })
-            .join(", ");
-          lines.push(`Alternative consigliate: ${altLabels}`);
-        }
-        if (p.pairings?.length) {
-          const ps = p.pairings
-            .map((id) => {
-              const x = getProductById(id);
-              return x ? `${x.name} (${x.id})` : id;
-            })
-            .join(", ");
-          lines.push(`Pairing consigliati: ${ps}`);
-        }
-        if (p.related_products?.length) {
-          const rs = p.related_products
-            .map((id) => {
-              const x = getProductById(id);
-              return x ? `${x.name} (${x.id})` : id;
-            })
-            .join(", ");
-          lines.push(`Prodotti correlati: ${rs}`);
-        }
-        if (p.options) {
-          lines.push("Opzioni:");
-          if (p.options.size) {
-            const sz = p.options.size;
-            const mods = sz.values
-              .map(
-                (v) =>
-                  `${v}${sz.price_modifier[v] ? ` (+€${sz.price_modifier[v]?.toFixed(2)})` : ""}`,
-              )
-              .join(", ");
-            lines.push(`  - size: ${mods} · default ${sz.default}`);
-          }
-          if (p.options.milk) {
-            const milkLabels = p.options.milk.values
-              .map((id) => {
-                const m = getProductById(id);
-                if (!m) return id;
-                const avail = m.available ? "" : " [ESAURITO]";
-                const mod = m.price > 0 ? ` (+€${m.price.toFixed(2)})` : "";
-                return `${m.name} (${m.id})${mod}${avail}`;
-              })
-              .join(", ");
-            lines.push(
-              `  - milk: ${milkLabels} · default ${p.options.milk.default}`,
-            );
-          }
-          if (p.options.sweetness) {
-            lines.push(
-              `  - sweetness: ${p.options.sweetness.values.join(", ")} · default ${p.options.sweetness.default}`,
-            );
-          }
-        }
-        const text = lines.join("\n");
+        const card = buildProductCard(p);
+        const summary = [
+          `${p.name} — €${p.price.toFixed(2)}`,
+          p.origin,
+          typeof p.intensity === "number" ? `intensità ${p.intensity}/10` : null,
+          p.options
+            ? `${
+                Object.keys(card.product.customization ?? {}).length
+              } opzioni di personalizzazione`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" — ");
         useCartStore
           .getState()
           .logToolCall("get_product", args, `${p.id} (${p.type})`);
-        return ok(text);
+        return {
+          content: [{ type: "text", text: summary }],
+          structuredContent: card as unknown as Record<string, unknown>,
+        };
       },
     },
     {

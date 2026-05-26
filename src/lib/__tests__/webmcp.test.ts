@@ -221,11 +221,18 @@ describe("WebMCP tools", () => {
       fakeAgent,
     );
     expect(res.isError).toBeFalsy();
-    const t = res.content[0].text;
-    expect(t).toContain("Cappuccino");
-    expect(t).toContain("Intensità");
-    expect(t).toContain("cornetto-vuoto");
-    expect(t).toContain("Latte");
+    const card = res.structuredContent as {
+      product: {
+        name: string;
+        attributes: { intensity?: { value: number } };
+        pairings: Array<{ id: string }>;
+        customization?: Record<string, unknown>;
+      };
+    };
+    expect(card.product.name).toContain("Cappuccino");
+    expect(card.product.attributes.intensity?.value).toBeGreaterThan(0);
+    expect(card.product.pairings.map((p) => p.id)).toContain("cornetto-vuoto");
+    expect(card.product.customization?.milk).toBeDefined();
   });
 
   it("get_product flags out of stock with alternatives", async () => {
@@ -234,10 +241,13 @@ describe("WebMCP tools", () => {
       fakeAgent,
     );
     expect(res.isError).toBeFalsy();
-    const t = res.content[0].text;
-    expect(t.toLowerCase()).toMatch(/esaurit[ao]/);
-    expect(t).toContain("milk-oat");
-    expect(t).toContain("milk-almond");
+    const card = res.structuredContent as {
+      product: { available: boolean; alternatives: Array<{ id: string }> };
+    };
+    expect(card.product.available).toBe(false);
+    const altIds = card.product.alternatives.map((a) => a.id);
+    expect(altIds).toContain("milk-oat");
+    expect(altIds).toContain("milk-almond");
   });
 
   it("get_product surfaces related_products for cross-modal", async () => {
@@ -245,7 +255,10 @@ describe("WebMCP tools", () => {
       { product_id: "filtro-etiopia" },
       fakeAgent,
     );
-    expect(res.content[0].text).toContain("beans-etiopia-250g");
+    const card = res.structuredContent as {
+      product: { related_products: Array<{ id: string }> };
+    };
+    expect(card.product.related_products.map((r) => r.id)).toContain("beans-etiopia-250g");
   });
 
   it("get_product returns error for unknown id", async () => {
@@ -254,6 +267,36 @@ describe("WebMCP tools", () => {
       fakeAgent,
     );
     expect(res.isError).toBe(true);
+  });
+
+  it("get_product returns structuredContent product_card with customization", async () => {
+    const res = await findTool("get_product").execute(
+      { product_id: "cappuccino" },
+      fakeAgent,
+    );
+    expect(res.isError).toBeFalsy();
+    expect(res.structuredContent).toBeDefined();
+    expect(res.structuredContent).toMatchObject({
+      kind: "product_card",
+      product: expect.objectContaining({
+        id: "cappuccino",
+        image_url: expect.stringContaining("/cappuccino.webp"),
+        customization: expect.objectContaining({
+          milk: expect.objectContaining({ default: "milk-whole" }),
+        }),
+      }),
+    });
+    expect(res.content[0].type).toBe("text");
+    expect((res.content[0] as { text: string }).text).toContain("Cappuccino");
+  });
+
+  it("get_product missing product has no structuredContent and isError", async () => {
+    const res = await findTool("get_product").execute(
+      { product_id: "nonexistent" },
+      fakeAgent,
+    );
+    expect(res.isError).toBe(true);
+    expect(res.structuredContent).toBeUndefined();
   });
 
   it("add_to_cart accepts options and stores them on the line", async () => {
@@ -375,7 +418,8 @@ describe("WebMCP tools", () => {
       fakeAgent,
     );
     expect(res.isError).toBeFalsy();
-    expect(res.content[0].text).toContain("Espresso Classico");
+    const card = res.structuredContent as { product: { id: string } };
+    expect(card.product.id).toBe("espresso");
   });
 
   it("remove_from_cart with options removes the specific line", async () => {
