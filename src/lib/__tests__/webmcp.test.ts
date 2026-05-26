@@ -160,8 +160,38 @@ describe("WebMCP tools", () => {
   it("get_cart returns current state", async () => {
     useCartStore.getState().addItem("espresso", 2);
     const res = await findTool("get_cart").execute({}, fakeAgent);
-    expect(res.content[0].text).toContain("Espresso Classico");
-    expect(res.content[0].text).toContain("3.00");
+    expect(res.isError).toBeFalsy();
+    const cart = res.structuredContent as {
+      lines: Array<{ product_id: string; quantity: number; line_total: number }>;
+      total: number;
+    };
+    expect(cart.lines).toHaveLength(1);
+    expect(cart.lines[0].product_id).toBe("espresso");
+    expect(cart.lines[0].quantity).toBe(2);
+    expect(cart.total).toBeCloseTo(3.0, 2);
+  });
+
+  it("get_cart returns structuredContent cart (empty)", async () => {
+    const res = await findTool("get_cart").execute({}, fakeAgent);
+    expect(res.structuredContent).toMatchObject({
+      kind: "cart",
+      empty: true,
+      lines: [],
+      subtotal: 0,
+      total: 0,
+      coupon: null,
+    });
+  });
+
+  it("get_cart returns structuredContent cart with lines after add", async () => {
+    await findTool("add_to_cart").execute(
+      { product_id: "espresso", quantity: 1 },
+      fakeAgent,
+    );
+    const res = await findTool("get_cart").execute({}, fakeAgent);
+    const cart = res.structuredContent as { lines: unknown[]; empty: boolean };
+    expect(cart.empty).toBe(false);
+    expect(cart.lines).toHaveLength(1);
   });
 
   it("checkout requests user interaction and succeeds when confirmed", async () => {

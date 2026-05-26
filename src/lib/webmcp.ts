@@ -7,8 +7,10 @@ import {
 } from "./products";
 import { defaultOptionsFor, useCartStore } from "../store/cart";
 import {
+  buildCart,
   buildProductCard,
   buildProductList,
+  CART_SCHEMA,
   PRODUCT_CARD_SCHEMA,
   PRODUCT_LIST_SCHEMA,
 } from "./webmcp-schemas";
@@ -117,24 +119,6 @@ function formatOptionsLabel(o?: {
   return bits.length ? ` (${bits.join(", ")})` : "";
 }
 
-function formatLine(item: {
-  productId: string;
-  quantity: number;
-  options?: { size?: SizeOption; milk?: string; sweetness?: SweetnessOption };
-}): string {
-  const p = getProductById(item.productId);
-  if (!p) return `${item.productId} x${item.quantity}`;
-  const opts = formatOptionsLabel(item.options);
-  let unit = p.price;
-  if (item.options?.size && p.options?.size?.price_modifier) {
-    unit += p.options.size.price_modifier[item.options.size] ?? 0;
-  }
-  if (item.options?.milk) {
-    const m = getProductById(item.options.milk);
-    if (m) unit += m.price;
-  }
-  return `${p.name} x${item.quantity}${opts} (€${(unit * item.quantity).toFixed(2)})`;
-}
 
 function summarizeQuery(args: Record<string, unknown>): string {
   const bits: string[] = [];
@@ -640,27 +624,33 @@ export function buildTools(): Tool[] {
     },
     {
       name: "get_cart",
-      description: "Ritorna il contenuto corrente del carrello con totali.",
+      description:
+        "Restituisce il contenuto corrente del carrello con totali e coupon.\n" +
+        "Usalo quando l'utente chiede \"cosa ho nel carrello\", \"quanto ho speso\",\n" +
+        "o serve riassumere lo stato prima di un suggerimento (\"cosa va bene con\n" +
+        "quello che ho?\").\n" +
+        "Output: structuredContent.kind=\"cart\" con lines (con options_label e\n" +
+        "line_total), subtotal/total, coupon (o null), empty, next_actions.\n" +
+        "Renderizza come card carrello: lista compatta righe (immagine, nome, qty,\n" +
+        "opzioni in 1 riga, prezzo), riga sconto se coupon != null, totale in grassetto.\n" +
+        "Dopo: se !empty proponi checkout o apply_coupon; se empty invita a esplorare\n" +
+        "con search_products.",
       inputSchema: { type: "object", properties: {} },
+      outputSchema: CART_SCHEMA,
       async execute() {
-        const s = useCartStore.getState();
-        if (s.items.length === 0) {
-          useCartStore.getState().logToolCall("get_cart", {}, "vuoto");
-          return ok("Il carrello è vuoto.");
-        }
-        const lines = s.items.map((it) => `- ${formatLine(it)}`);
-        const summary = [
-          ...lines,
-          `Subtotale: €${s.subtotal().toFixed(2)}`,
-          s.coupon
-            ? `Sconto (${s.coupon}): -€${s.discount().toFixed(2)}`
-            : "Nessun coupon applicato",
-          `Totale: €${s.total().toFixed(2)}`,
-        ].join("\n");
+        const cart = buildCart();
+        const summary = cart.empty
+          ? "Il carrello è vuoto."
+          : `Carrello: ${cart.lines.length} righe, totale €${cart.total.toFixed(2)}${
+              cart.coupon ? ` (sconto ${cart.coupon.code} -€${cart.coupon.discount.toFixed(2)})` : ""
+            }`;
         useCartStore
           .getState()
-          .logToolCall("get_cart", {}, `${s.items.length} righe`);
-        return ok(summary);
+          .logToolCall("get_cart", {}, `${cart.lines.length} righe`);
+        return {
+          content: [{ type: "text", text: summary }],
+          structuredContent: cart as unknown as Record<string, unknown>,
+        };
       },
     },
     {
