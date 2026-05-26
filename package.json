@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "relay:status": "node scripts/relay-status.mjs",
     "imagegen:test:editorial": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style editorial --test",
     "imagegen:test:dipinto": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style dipinto --test",
     "imagegen:all:editorial": "tsx --env-file-if-exists=tools/imagegen/.env scripts/gen-product-images.ts --style editorial --all",
