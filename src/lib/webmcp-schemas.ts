@@ -557,7 +557,7 @@ export function buildCart(): Cart {
       image_url: imageUrlFor(it.productId),
       quantity: it.quantity,
       options_label: formatOptionsLabel(it.options),
-      unit_price: unit,
+      unit_price: Math.round(unit * 100) / 100,
       line_total: Math.round(unit * it.quantity * 100) / 100,
     };
     if (it.options) line.options = it.options;

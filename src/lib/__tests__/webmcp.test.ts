@@ -633,6 +633,11 @@ describe("WebMCP tools", () => {
     );
     expect(second.isError).toBe(true);
     expect(second.content[0].text).toContain("Limite");
+    expect(second.structuredContent).toMatchObject({
+      kind: "mutation_result",
+      ok: false,
+      error: expect.objectContaining({ code: "line_quantity_limit" }),
+    });
     expect(useCartStore.getState().items[0].quantity).toBe(6);
   });
 
