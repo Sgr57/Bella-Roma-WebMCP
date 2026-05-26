@@ -8,11 +8,14 @@ import {
 import { defaultOptionsFor, useCartStore } from "../store/cart";
 import {
   buildCart,
+  buildMutationResult,
   buildProductCard,
   buildProductList,
   CART_SCHEMA,
+  MUTATION_RESULT_SCHEMA,
   PRODUCT_CARD_SCHEMA,
   PRODUCT_LIST_SCHEMA,
+  type ErrorCode,
 } from "./webmcp-schemas";
 
 const MAX_LINE_QUANTITY = 10;
@@ -90,18 +93,6 @@ function err(text: string): ToolResult {
   return { content: [{ type: "text", text }], isError: true };
 }
 
-function formatAlternatives(ids?: string[]): string {
-  if (!ids || ids.length === 0) return "";
-  const labels = ids
-    .map((id) => {
-      const p = getProductById(id);
-      if (!p) return id;
-      const mod = p.price > 0 ? ` (+€${p.price.toFixed(2)})` : "";
-      return `${p.name} (${p.id})${mod}`;
-    })
-    .join(", ");
-  return ` Alternative simili: ${labels}.`;
-}
 
 function formatOptionsLabel(o?: {
   size?: SizeOption;
@@ -128,6 +119,49 @@ function summarizeQuery(args: Record<string, unknown>): string {
     bits.push(`${k}=${Array.isArray(v) ? v.join("|") : v}`);
   }
   return bits.length ? bits.join(", ") : "tutti i prodotti";
+}
+
+function mutErr(
+  tool: string,
+  code: ErrorCode,
+  message: string,
+  alternatives?: Array<{ id: string; label: string; price_delta?: number }>,
+): ToolResult {
+  const error: { code: ErrorCode; message: string; alternatives?: typeof alternatives } = {
+    code,
+    message,
+  };
+  if (alternatives && alternatives.length > 0) error.alternatives = alternatives;
+  return {
+    content: [{ type: "text", text: message }],
+    structuredContent: buildMutationResult({ ok: false, tool, error }) as unknown as Record<string, unknown>,
+    isError: true,
+  };
+}
+
+function mutOk(tool: string, message: string): ToolResult {
+  return {
+    content: [{ type: "text", text: message }],
+    structuredContent: buildMutationResult({ ok: true, tool, message }) as unknown as Record<string, unknown>,
+  };
+}
+
+function altsFromProductIds(
+  ids: string[] | undefined,
+): Array<{ id: string; label: string; price_delta?: number }> {
+  if (!ids) return [];
+  const out: Array<{ id: string; label: string; price_delta?: number }> = [];
+  for (const id of ids) {
+    const p = getProductById(id);
+    if (!p) continue;
+    const entry: { id: string; label: string; price_delta?: number } = {
+      id: p.id,
+      label: p.name,
+    };
+    if (p.price > 0) entry.price_delta = p.price;
+    out.push(entry);
+  }
+  return out;
 }
 
 export function buildTools(): Tool[] {
@@ -370,7 +404,15 @@ export function buildTools(): Tool[] {
     {
       name: "add_to_cart",
       description:
-        "Aggiunge un prodotto al carrello in una certa quantità. Supporta options (size, milk, sweetness) se il prodotto le offre. Se il prodotto o l'opzione richiesta è ESAURITA, ritorna un errore strutturato con alternative coerenti che puoi proporre all'utente.",
+        "Aggiunge una riga al carrello con quantità e opzioni scelte.\n" +
+        "Usalo SOLO dopo che l'utente ha confermato le opzioni di customization\n" +
+        "(quando esistono). Se l'utente dice solo \"aggiungi cappuccino\" e il prodotto\n" +
+        "ha customization, chiedi prima latte/size/zucchero invece di assumere i default.\n" +
+        "Output: structuredContent.kind=\"mutation_result\" con ok, message, e cart\n" +
+        "ricalcolato. Renderizza il message in 1 riga + la card del carrello aggiornata\n" +
+        "(no doppia get_cart). In caso di ok=false leggi error.code e error.alternatives\n" +
+        "per proporre rimpiazzi.\n" +
+        "Dopo: chiedi se vuole completare con checkout o continuare a curiosare.",
       inputSchema: {
         type: "object",
         properties: {
@@ -390,6 +432,7 @@ export function buildTools(): Tool[] {
         },
         required: ["product_id", "quantity"],
       },
+      outputSchema: MUTATION_RESULT_SCHEMA,
       async execute(args) {
         const a = args as {
           product_id?: unknown;
@@ -397,111 +440,97 @@ export function buildTools(): Tool[] {
           options?: { size?: SizeOption; milk?: string; sweetness?: SweetnessOption };
         };
         if (typeof a.product_id !== "string" || a.product_id.length === 0) {
-          useCartStore
-            .getState()
-            .logToolCall("add_to_cart", args, "errore: product_id mancante");
-          return err("Parametro 'product_id' obbligatorio (stringa non vuota).");
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: product_id mancante");
+          return mutErr("add_to_cart", "product_not_found", "Parametro 'product_id' obbligatorio.");
         }
         const product_id = a.product_id;
         const qCheck = validateQuantity(a.quantity);
         if (!qCheck.ok) {
           useCartStore.getState().logToolCall("add_to_cart", args, `errore: ${qCheck.message}`);
-          return err(qCheck.message);
+          return mutErr("add_to_cart", "quantity_out_of_range", qCheck.message);
         }
         const quantity = qCheck.value;
         const options = a.options;
         const product = findProductCaseInsensitive(product_id);
         if (!product) {
-          useCartStore
-            .getState()
-            .logToolCall("add_to_cart", args, "errore: prodotto non trovato");
-          return err(`Prodotto "${product_id}" non trovato.`);
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: prodotto non trovato");
+          return mutErr("add_to_cart", "product_not_found", `Prodotto "${product_id}" non trovato.`);
         }
         if (product.type === "milk_option") {
-          useCartStore
-            .getState()
-            .logToolCall("add_to_cart", args, "errore: milk_option non vendibile");
-          return err(
-            `"${product.name}" è un modificatore latte, non vendibile da solo. Usalo come options.milk su una bevanda.`,
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: milk_option non vendibile");
+          return mutErr(
+            "add_to_cart",
+            "invalid_option",
+            `"${product.name}" è un modificatore latte, non vendibile da solo. Usalo come options.milk.`,
           );
         }
         if (!product.available) {
-          const altText = formatAlternatives(product.alternatives);
-          const msg = `Prodotto "${product.name}" ESAURITO.${altText}`;
           useCartStore.getState().logToolCall("add_to_cart", args, "errore: esaurito");
-          return err(msg);
+          return mutErr(
+            "add_to_cart",
+            "out_of_stock",
+            `Prodotto "${product.name}" esaurito.`,
+            altsFromProductIds(product.alternatives),
+          );
         }
-        const existingQty = useCartStore
-          .getState()
-          .quantityFor(product.id, options);
+        const existingQty = useCartStore.getState().quantityFor(product.id, options);
         if (existingQty + quantity > MAX_LINE_QUANTITY) {
-          const msg = `Limite di ${MAX_LINE_QUANTITY} per riga: ne hai già ${existingQty}, puoi aggiungerne al massimo ${MAX_LINE_QUANTITY - existingQty}.`;
-          useCartStore
-            .getState()
-            .logToolCall("add_to_cart", args, "errore: limite riga superato");
-          return err(msg);
+          const remaining = MAX_LINE_QUANTITY - existingQty;
+          const msg = `Limite di ${MAX_LINE_QUANTITY} per riga: ne hai già ${existingQty}, puoi aggiungerne al massimo ${remaining}.`;
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: limite riga superato");
+          return mutErr("add_to_cart", "line_quantity_limit", msg);
         }
-        if (options?.size) {
-          if (!product.options?.size?.values.includes(options.size)) {
-            useCartStore
-              .getState()
-              .logToolCall("add_to_cart", args, "errore: size non offerta");
-            return err(
-              `Il prodotto "${product.name}" non offre la dimensione "${options.size}".`,
-            );
-          }
+        if (options?.size && !product.options?.size?.values.includes(options.size)) {
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: size non offerta");
+          return mutErr(
+            "add_to_cart",
+            "invalid_option",
+            `Il prodotto "${product.name}" non offre la dimensione "${options.size}".`,
+          );
         }
-        if (options?.sweetness) {
-          if (!product.options?.sweetness?.values.includes(options.sweetness)) {
-            useCartStore
-              .getState()
-              .logToolCall("add_to_cart", args, "errore: sweetness non offerta");
-            return err(
-              `Il prodotto "${product.name}" non offre il livello di zucchero "${options.sweetness}".`,
-            );
-          }
+        if (options?.sweetness && !product.options?.sweetness?.values.includes(options.sweetness)) {
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore: sweetness non offerta");
+          return mutErr(
+            "add_to_cart",
+            "invalid_option",
+            `Il prodotto "${product.name}" non offre il livello di zucchero "${options.sweetness}".`,
+          );
         }
         if (options?.milk) {
           if (!product.options?.milk?.values.includes(options.milk)) {
-            useCartStore
-              .getState()
-              .logToolCall("add_to_cart", args, "errore: milk non offerto");
-            return err(
+            useCartStore.getState().logToolCall("add_to_cart", args, "errore: milk non offerto");
+            return mutErr(
+              "add_to_cart",
+              "invalid_option",
               `Il prodotto "${product.name}" non offre l'opzione latte "${options.milk}".`,
             );
           }
           const milkProduct = getProductById(options.milk);
           if (!milkProduct) {
-            return err(`Opzione latte "${options.milk}" sconosciuta.`);
+            return mutErr("add_to_cart", "invalid_option", `Opzione latte "${options.milk}" sconosciuta.`);
           }
           if (!milkProduct.available) {
-            const altText = formatAlternatives(milkProduct.alternatives);
-            const msg = `Opzione latte "${milkProduct.name}" ESAURITA.${altText}`;
-            useCartStore
-              .getState()
-              .logToolCall("add_to_cart", args, "errore: milk esaurito");
-            return err(msg);
+            useCartStore.getState().logToolCall("add_to_cart", args, "errore: milk esaurito");
+            return mutErr(
+              "add_to_cart",
+              "out_of_stock",
+              `Opzione latte "${milkProduct.name}" esaurita.`,
+              altsFromProductIds(milkProduct.alternatives),
+            );
           }
         }
-        const okAdd = useCartStore
-          .getState()
-          .addItem(product.id, quantity, options);
+        const okAdd = useCartStore.getState().addItem(product.id, quantity, options);
         if (!okAdd) {
-          useCartStore
-            .getState()
-            .logToolCall("add_to_cart", args, "errore generico");
-          return err(`Impossibile aggiungere "${product_id}".`);
+          useCartStore.getState().logToolCall("add_to_cart", args, "errore generico");
+          return mutErr("add_to_cart", "invalid_option", `Impossibile aggiungere "${product_id}".`);
         }
         const effective = { ...defaultOptionsFor(product.id), ...options };
         const optsLabel = formatOptionsLabel(effective);
         const totalQty = useCartStore.getState().quantityFor(product.id, options);
-        const mergeNote =
-          existingQty > 0
-            ? ` (riga ora x${totalQty}, era x${existingQty})`
-            : "";
+        const mergeNote = existingQty > 0 ? ` (riga ora x${totalQty})` : "";
         const msg = `Aggiunto: ${product.name} x${quantity}${optsLabel}${mergeNote}.`;
         useCartStore.getState().logToolCall("add_to_cart", args, msg);
-        return ok(msg);
+        return mutOk("add_to_cart", msg);
       },
     },
     {

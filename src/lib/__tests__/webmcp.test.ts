@@ -123,10 +123,71 @@ describe("WebMCP tools", () => {
   it("add_to_cart errors on unknown product", async () => {
     const res = await findTool("add_to_cart").execute(
       { product_id: "ghost", quantity: 1 },
-      fakeAgent
+      fakeAgent,
     );
     expect(res.isError).toBe(true);
-    expect(res.content[0].text.toLowerCase()).toContain("non trovato");
+    expect(res.structuredContent).toMatchObject({
+      kind: "mutation_result",
+      ok: false,
+      error: expect.objectContaining({ code: "product_not_found" }),
+    });
+  });
+
+  it("add_to_cart returns mutation_result ok=true with embedded cart", async () => {
+    const res = await findTool("add_to_cart").execute(
+      { product_id: "espresso", quantity: 1 },
+      fakeAgent,
+    );
+    expect(res.structuredContent).toMatchObject({
+      kind: "mutation_result",
+      ok: true,
+      tool: "add_to_cart",
+      message: expect.stringContaining("Espresso"),
+      cart: expect.objectContaining({ kind: "cart", empty: false }),
+    });
+    expect(res.isError).toBeFalsy();
+  });
+
+  it("add_to_cart returns mutation_result ok=false with error.code=out_of_stock for soy milk", async () => {
+    const res = await findTool("add_to_cart").execute(
+      { product_id: "cappuccino", quantity: 1, options: { milk: "milk-soy" } },
+      fakeAgent,
+    );
+    expect(res.structuredContent).toMatchObject({
+      kind: "mutation_result",
+      ok: false,
+      tool: "add_to_cart",
+      error: expect.objectContaining({
+        code: "out_of_stock",
+        alternatives: expect.arrayContaining([
+          expect.objectContaining({ id: "milk-oat" }),
+        ]),
+      }),
+    });
+    expect(res.isError).toBe(true);
+  });
+
+  it("add_to_cart returns error.code=quantity_out_of_range for qty=0", async () => {
+    const res = await findTool("add_to_cart").execute(
+      { product_id: "espresso", quantity: 0 },
+      fakeAgent,
+    );
+    expect(res.structuredContent).toMatchObject({
+      kind: "mutation_result",
+      ok: false,
+      error: expect.objectContaining({ code: "quantity_out_of_range" }),
+    });
+  });
+
+  it("add_to_cart returns error.code=invalid_option when adding a milk_option directly", async () => {
+    const res = await findTool("add_to_cart").execute(
+      { product_id: "milk-oat", quantity: 1 },
+      fakeAgent,
+    );
+    expect(res.structuredContent).toMatchObject({
+      ok: false,
+      error: expect.objectContaining({ code: "invalid_option" }),
+    });
   });
 
   it("remove_from_cart removes item", async () => {
@@ -409,8 +470,12 @@ describe("WebMCP tools", () => {
     expect(res.isError).toBe(true);
     const t = res.content[0].text;
     expect(t.toLowerCase()).toMatch(/esaurit[ao]/);
-    expect(t).toContain("milk-oat");
-    expect(t).toContain("milk-almond");
+    const altIds = (
+      (res.structuredContent as { error?: { alternatives?: Array<{ id: string }> } })
+        ?.error?.alternatives ?? []
+    ).map((a) => a.id);
+    expect(altIds).toContain("milk-oat");
+    expect(altIds).toContain("milk-almond");
     expect(useCartStore.getState().items).toHaveLength(0);
   });
 
