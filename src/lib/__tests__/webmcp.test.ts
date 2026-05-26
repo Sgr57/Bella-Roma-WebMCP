@@ -326,18 +326,60 @@ describe("WebMCP tools", () => {
     expect(useCartStore.getState().items).toEqual([]);
   });
 
-  it("checkout returns non-error message when user cancels", async () => {
+  it("checkout returns user_cancelled mutation_result when user rejects", async () => {
     useCartStore.getState().addItem("espresso", 2);
     fakeAgent.requestUserInteraction.mockImplementationOnce(async () => false);
     const res = await findTool("checkout").execute({}, fakeAgent);
-    expect(res.isError).toBeFalsy();
-    expect(res.content[0].text.toLowerCase()).toContain("annullato");
+    expect(res.isError).toBe(true);
+    expect(res.structuredContent).toMatchObject({
+      ok: false,
+      error: expect.objectContaining({ code: "user_cancelled" }),
+    });
     expect(useCartStore.getState().items).toHaveLength(1);
   });
 
   it("checkout errors on empty cart", async () => {
     const res = await findTool("checkout").execute({}, fakeAgent);
     expect(res.isError).toBe(true);
+    expect(res.structuredContent).toMatchObject({
+      ok: false,
+      error: expect.objectContaining({ code: "empty_cart" }),
+    });
+  });
+
+  it("checkout returns mutation_result ok=true on confirmed payment", async () => {
+    await findTool("add_to_cart").execute({ product_id: "espresso", quantity: 1 }, fakeAgent);
+    fakeAgent.requestUserInteraction.mockImplementationOnce(async () => true);
+    const res = await findTool("checkout").execute({}, fakeAgent);
+    expect(res.structuredContent).toMatchObject({
+      kind: "mutation_result",
+      ok: true,
+      tool: "checkout",
+      message: expect.stringContaining("Ordine confermato"),
+      cart: expect.objectContaining({ empty: true }),
+    });
+  });
+
+  it("checkout returns mutation_result ok=false error.code=empty_cart on empty", async () => {
+    const res = await findTool("checkout").execute({}, fakeAgent);
+    expect(res.structuredContent).toMatchObject({
+      kind: "mutation_result",
+      ok: false,
+      tool: "checkout",
+      error: expect.objectContaining({ code: "empty_cart" }),
+    });
+  });
+
+  it("checkout returns mutation_result ok=false error.code=user_cancelled when user rejects", async () => {
+    await findTool("add_to_cart").execute({ product_id: "espresso", quantity: 1 }, fakeAgent);
+    const reject = {
+      requestUserInteraction: vi.fn(async () => false),
+    };
+    const res = await findTool("checkout").execute({}, reject);
+    expect(res.structuredContent).toMatchObject({
+      ok: false,
+      error: expect.objectContaining({ code: "user_cancelled" }),
+    });
   });
 
   it("search_products excludes milk_option by default", async () => {

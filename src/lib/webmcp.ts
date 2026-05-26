@@ -86,9 +86,6 @@ export type Tool = {
   execute: (args: Record<string, unknown>, agent?: Agent) => Promise<ToolResult>;
 };
 
-function ok(text: string): ToolResult {
-  return { content: [{ type: "text", text }] };
-}
 function err(text: string): ToolResult {
   return { content: [{ type: "text", text }], isError: true };
 }
@@ -744,13 +741,21 @@ export function buildTools(): Tool[] {
     {
       name: "checkout",
       description:
-        "Conferma l'ordine e completa il pagamento. Richiede conferma esplicita dell'utente.",
+        "Conferma l'ordine e completa il pagamento. Richiede conferma esplicita\n" +
+        "dell'utente tramite agent.requestUserInteraction.\n" +
+        "Usalo quando l'utente dice \"paga\", \"completa\", \"conferma l'ordine\".\n" +
+        "Output: structuredContent.kind=\"mutation_result\". ok=true con message di\n" +
+        "ricevuta e cart vuoto; ok=false con error.code (\"empty_cart\" o\n" +
+        "\"user_cancelled\") quando applicabile.\n" +
+        "Renderizza il message + se ok=true mostra un breve riepilogo ricevuta\n" +
+        "(totale pagato), se ok=false leggi error.code per spiegare cosa è successo.",
       inputSchema: { type: "object", properties: {} },
+      outputSchema: MUTATION_RESULT_SCHEMA,
       async execute(_args, agent) {
         const s = useCartStore.getState();
         if (s.items.length === 0) {
           useCartStore.getState().logToolCall("checkout", {}, "carrello vuoto");
-          return err("Il carrello è vuoto, niente da pagare.");
+          return mutErr("checkout", "empty_cart", "Il carrello è vuoto, niente da pagare.");
         }
         const total = s.total();
         const { requestCheckoutConfirmation } = await import("./checkout-bridge");
@@ -759,15 +764,13 @@ export function buildTools(): Tool[] {
           ? await agent.requestUserInteraction(ask)
           : await ask();
         if (!confirmed) {
-          useCartStore
-            .getState()
-            .logToolCall("checkout", {}, "annullato dall'utente");
-          return ok("Pagamento annullato dall'utente.");
+          useCartStore.getState().logToolCall("checkout", {}, "annullato dall'utente");
+          return mutErr("checkout", "user_cancelled", "Pagamento annullato dall'utente.");
         }
         const result = useCartStore.getState().checkout();
         const msg = `Ordine confermato! Totale pagato: €${result.total.toFixed(2)}.`;
         useCartStore.getState().logToolCall("checkout", {}, msg);
-        return ok(msg);
+        return mutOk("checkout", msg);
       },
     },
   ];
