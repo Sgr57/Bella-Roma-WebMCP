@@ -54,6 +54,7 @@ export type ContentBlock = TextBlock | ResourceLinkBlock;
 
 export type ToolResult = {
   content: ContentBlock[];
+  structuredContent?: Record<string, unknown>;
   isError?: boolean;
 };
 
@@ -70,6 +71,7 @@ export type Tool = {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
   execute: (args: Record<string, unknown>, agent?: Agent) => Promise<ToolResult>;
 };
 
@@ -130,6 +132,27 @@ function formatLine(item: {
 
 export function buildTools(): Tool[] {
   return [
+    {
+      name: "__probe_structured",
+      description:
+        "[PRE-FLIGHT] Tool temporaneo per verificare che structuredContent arrivi a Claude Desktop. Da rimuovere prima del merge.",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: {
+        type: "object",
+        properties: {
+          hello: { type: "string" },
+          probe_version: { type: "number" },
+        },
+        required: ["hello", "probe_version"],
+      },
+      async execute() {
+        useCartStore.getState().logToolCall("__probe_structured", {}, "probe");
+        return {
+          content: [{ type: "text", text: "ok" }],
+          structuredContent: { hello: "world", probe_version: 1 },
+        };
+      },
+    },
     {
       name: "search_products",
       description:

@@ -19,7 +19,7 @@ describe("WebMCP tools", () => {
   });
 
   it("exposes exactly 10 tools", () => {
-    expect(buildTools()).toHaveLength(10);
+    expect(buildTools()).toHaveLength(11); // 10 + probe temporaneo
   });
 
   it("show_product_image returns text + resource_link to jsdelivr CDN", async () => {
