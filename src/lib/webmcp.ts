@@ -152,27 +152,6 @@ function altsFromProductIds(
 export function buildTools(): Tool[] {
   return [
     {
-      name: "__probe_structured",
-      description:
-        "[PRE-FLIGHT] Tool temporaneo per verificare che structuredContent arrivi a Claude Desktop. Da rimuovere prima del merge.",
-      inputSchema: { type: "object", properties: {} },
-      outputSchema: {
-        type: "object",
-        properties: {
-          hello: { type: "string" },
-          probe_version: { type: "number" },
-        },
-        required: ["hello", "probe_version"],
-      },
-      async execute() {
-        useCartStore.getState().logToolCall("__probe_structured", {}, "probe");
-        return {
-          content: [{ type: "text", text: "ok" }],
-          structuredContent: { hello: "world", probe_version: 1 },
-        };
-      },
-    },
-    {
       name: "search_products",
       description:
         "Cerca prodotti nel catalogo con filtri AND (testo, categoria, prezzo, tag,\n" +

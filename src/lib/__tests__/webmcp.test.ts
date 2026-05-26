@@ -18,8 +18,8 @@ describe("WebMCP tools", () => {
     fakeAgent.requestUserInteraction.mockClear();
   });
 
-  it("exposes exactly 10 tools", () => {
-    expect(buildTools()).toHaveLength(10); // 9 reali + 1 probe temporaneo
+  it("exposes exactly 9 tools", () => {
+    expect(buildTools()).toHaveLength(9);
   });
 
   it("search_products returns all products when no filter", async () => {
