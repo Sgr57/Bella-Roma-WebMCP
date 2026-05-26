@@ -692,7 +692,9 @@ export function buildTools(): Tool[] {
         "ricevuta e cart vuoto; ok=false con error.code (\"empty_cart\" o\n" +
         "\"user_cancelled\") quando applicabile.\n" +
         "Renderizza il message + se ok=true mostra un breve riepilogo ricevuta\n" +
-        "(totale pagato), se ok=false leggi error.code per spiegare cosa è successo.",
+        "(totale pagato), se ok=false leggi error.code per spiegare cosa è successo.\n" +
+        "Dopo: se ok=true ringrazia e proponi di esplorare di nuovo con search_products;\n" +
+        "se user_cancelled chiedi se modificare l'ordine; se empty_cart invita ad aggiungere.",
       inputSchema: { type: "object", properties: {} },
       outputSchema: MUTATION_RESULT_SCHEMA,
       async execute(_args, agent) {
